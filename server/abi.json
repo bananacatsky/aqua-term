@@ -2,17 +2,49 @@
   {
     "type": "function",
     "name": "borrowOrders",
-    "inputs": [{"name": "", "type": "uint256"}],
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "outputs": [
-      {"name": "borrower", "type": "address"},
-      {"name": "maturity", "type": "uint40"},
-      {"name": "deadline", "type": "uint40"},
-      {"name": "faceAmount", "type": "uint128"},
-      {"name": "minDebtTokenOut", "type": "uint128"},
-      {"name": "ltvBps", "type": "uint16"},
-      {"name": "collateralId", "type": "uint256"},
-      {"name": "filledFace", "type": "uint128"},
-      {"name": "cancelled", "type": "bool"}
+      {
+        "name": "borrower",
+        "type": "address"
+      },
+      {
+        "name": "maturity",
+        "type": "uint40"
+      },
+      {
+        "name": "deadline",
+        "type": "uint40"
+      },
+      {
+        "name": "faceAmount",
+        "type": "uint128"
+      },
+      {
+        "name": "minDebtTokenOut",
+        "type": "uint128"
+      },
+      {
+        "name": "ltvBps",
+        "type": "uint16"
+      },
+      {
+        "name": "collateralId",
+        "type": "uint256"
+      },
+      {
+        "name": "filledFace",
+        "type": "uint128"
+      },
+      {
+        "name": "cancelled",
+        "type": "bool"
+      }
     ],
     "stateMutability": "view"
   },
@@ -20,28 +52,66 @@
     "type": "function",
     "name": "nextBorrowOrderId",
     "inputs": [],
-    "outputs": [{"name": "", "type": "uint256"}],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "nextSupplyOrderId",
     "inputs": [],
-    "outputs": [{"name": "", "type": "uint256"}],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "stateMutability": "view"
   },
   {
     "type": "function",
     "name": "supplyOrders",
-    "inputs": [{"name": "", "type": "uint256"}],
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "outputs": [
-      {"name": "supplier", "type": "address"},
-      {"name": "maturity", "type": "uint40"},
-      {"name": "deadline", "type": "uint40"},
-      {"name": "debtTokenIn", "type": "uint128"},
-      {"name": "minTermOut", "type": "uint128"},
-      {"name": "filledDebtToken", "type": "uint128"},
-      {"name": "cancelled", "type": "bool"}
+      {
+        "name": "supplier",
+        "type": "address"
+      },
+      {
+        "name": "maturity",
+        "type": "uint40"
+      },
+      {
+        "name": "deadline",
+        "type": "uint40"
+      },
+      {
+        "name": "debtTokenIn",
+        "type": "uint128"
+      },
+      {
+        "name": "minTermOut",
+        "type": "uint128"
+      },
+      {
+        "name": "filledDebtToken",
+        "type": "uint128"
+      },
+      {
+        "name": "cancelled",
+        "type": "bool"
+      }
     ],
     "stateMutability": "view"
   },
@@ -49,14 +119,46 @@
     "type": "event",
     "name": "BorrowOrderCreated",
     "inputs": [
-      {"name": "orderId", "type": "uint256", "indexed": true},
-      {"name": "borrower", "type": "address", "indexed": true},
-      {"name": "maturity", "type": "uint40", "indexed": false},
-      {"name": "deadline", "type": "uint40", "indexed": false},
-      {"name": "faceAmount", "type": "uint256", "indexed": false},
-      {"name": "minDebtTokenOut", "type": "uint256", "indexed": false},
-      {"name": "ltvBps", "type": "uint256", "indexed": false},
-      {"name": "collateralId", "type": "uint256", "indexed": false}
+      {
+        "name": "orderId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "borrower",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "maturity",
+        "type": "uint40",
+        "indexed": false
+      },
+      {
+        "name": "deadline",
+        "type": "uint40",
+        "indexed": false
+      },
+      {
+        "name": "faceAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minDebtTokenOut",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "ltvBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "collateralId",
+        "type": "uint256",
+        "indexed": false
+      }
     ],
     "anonymous": false
   },
@@ -64,12 +166,36 @@
     "type": "event",
     "name": "SupplyOrderCreated",
     "inputs": [
-      {"name": "orderId", "type": "uint256", "indexed": true},
-      {"name": "supplier", "type": "address", "indexed": true},
-      {"name": "maturity", "type": "uint40", "indexed": false},
-      {"name": "deadline", "type": "uint40", "indexed": false},
-      {"name": "debtTokenIn", "type": "uint256", "indexed": false},
-      {"name": "minTermOut", "type": "uint256", "indexed": false}
+      {
+        "name": "orderId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "supplier",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "maturity",
+        "type": "uint40",
+        "indexed": false
+      },
+      {
+        "name": "deadline",
+        "type": "uint40",
+        "indexed": false
+      },
+      {
+        "name": "debtTokenIn",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minTermOut",
+        "type": "uint256",
+        "indexed": false
+      }
     ],
     "anonymous": false
   },
@@ -77,14 +203,572 @@
     "type": "event",
     "name": "OrdersMatched",
     "inputs": [
-      {"name": "borrowOrderId", "type": "uint256", "indexed": true},
-      {"name": "supplyOrderId", "type": "uint256", "indexed": true},
-      {"name": "matcher", "type": "address", "indexed": true},
-      {"name": "faceAmount", "type": "uint256", "indexed": false},
-      {"name": "supplierTermShares", "type": "uint256", "indexed": false},
-      {"name": "borrowerDebtTokenOut", "type": "uint256", "indexed": false},
-      {"name": "matcherTermShares", "type": "uint256", "indexed": false},
-      {"name": "matcherDebtToken", "type": "uint256", "indexed": false}
+      {
+        "name": "borrowOrderId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "supplyOrderId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "matcher",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "faceAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "supplierTermShares",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "borrowerDebtTokenOut",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "matcherTermShares",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "matcherDebtToken",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "function",
+    "name": "N_COLLATERAL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "borrowOrders",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "borrower",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "maturity",
+        "type": "uint40",
+        "internalType": "uint40"
+      },
+      {
+        "name": "deadline",
+        "type": "uint40",
+        "internalType": "uint40"
+      },
+      {
+        "name": "faceAmount",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "minDebtTokenOut",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "ltvBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "collateralId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "filledFace",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "cancelled",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "collateralConfigs",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "maxBorrowLtvBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "liquidationLtvBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "liquidationDiscountBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "collateralValue",
+    "inputs": [
+      {
+        "name": "borrower",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "currentLtv",
+    "inputs": [
+      {
+        "name": "borrower",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "debtByVault",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "debtToken",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "depositedCollateral",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "healthFactor",
+    "inputs": [
+      {
+        "name": "borrower",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "portfolioWeightedLiquidationLtv",
+    "inputs": [
+      {
+        "name": "borrower",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "portfolioWeightedMaxBorrowLtv",
+    "inputs": [
+      {
+        "name": "borrower",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "supplyOrders",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "supplier",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "maturity",
+        "type": "uint40",
+        "internalType": "uint40"
+      },
+      {
+        "name": "deadline",
+        "type": "uint40",
+        "internalType": "uint40"
+      },
+      {
+        "name": "debtTokenIn",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "minTermOut",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "filledDebtToken",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "cancelled",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalDebt",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "vaultForMaturity",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint40",
+        "internalType": "uint40"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract AquaTermVault"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "writtenDownByVault",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "BorrowOrderCreated",
+    "inputs": [
+      {
+        "name": "orderId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "borrower",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "maturity",
+        "type": "uint40",
+        "indexed": false,
+        "internalType": "uint40"
+      },
+      {
+        "name": "deadline",
+        "type": "uint40",
+        "indexed": false,
+        "internalType": "uint40"
+      },
+      {
+        "name": "faceAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "minDebtTokenOut",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "ltvBps",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "collateralId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrdersMatched",
+    "inputs": [
+      {
+        "name": "borrowOrderId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "supplyOrderId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "matcher",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "faceAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "supplierTermShares",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "borrowerDebtTokenOut",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "matcherTermShares",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "matcherDebtToken",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SupplyOrderCreated",
+    "inputs": [
+      {
+        "name": "orderId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "supplier",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "maturity",
+        "type": "uint40",
+        "indexed": false,
+        "internalType": "uint40"
+      },
+      {
+        "name": "deadline",
+        "type": "uint40",
+        "indexed": false,
+        "internalType": "uint40"
+      },
+      {
+        "name": "debtTokenIn",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "minTermOut",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
     ],
     "anonymous": false
   }

@@ -138,6 +138,25 @@ class Database:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_maturities(self, app_address: str, chain: str) -> list[int]:
+        app_address = app_address.lower()
+        chain = chain.lower()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT maturity FROM (
+                    SELECT maturity FROM borrow_orders
+                    WHERE app_address = ? AND chain = ?
+                    UNION
+                    SELECT maturity FROM supply_orders
+                    WHERE app_address = ? AND chain = ?
+                )
+                ORDER BY maturity ASC
+                """,
+                (app_address, chain, app_address, chain),
+            ).fetchall()
+        return [int(row["maturity"]) for row in rows]
+
     def set_last_synced_block(self, address: str, chain: str, block: int) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -438,6 +457,92 @@ class Database:
                 WHERE {where}
                 ORDER BY CAST(quote_num AS REAL) / CAST(quote_den AS REAL) DESC,
                          order_id ASC
+                LIMIT ? OFFSET ?
+                """,
+                [*args, limit, offset],
+            ).fetchall()
+
+        return [self._format_supply_row(dict(row)) for row in rows], int(total)
+
+    def list_maker_borrow_orders(
+        self,
+        app_address: str,
+        chain: str,
+        maker: str,
+        *,
+        page: int,
+        limit: int,
+        include_expired: bool = False,
+        include_closed: bool = False,
+    ) -> tuple[list[dict[str, Any]], int]:
+        app_address = app_address.lower()
+        chain = chain.lower()
+        maker = maker.lower()
+        offset = (page - 1) * limit
+        filters = ["app_address = ?", "chain = ?", "borrower = ?"]
+        args: list[Any] = [app_address, chain, maker]
+        if not include_closed:
+            filters.append("cancelled = 0")
+            filters.append("CAST(face_amount AS INTEGER) > CAST(filled_face AS INTEGER)")
+        if not include_expired:
+            filters.append("deadline >= ?")
+            args.append(int(time.time()))
+        where = " AND ".join(filters)
+
+        with self._connect() as conn:
+            total = conn.execute(
+                f"SELECT COUNT(*) AS c FROM borrow_orders WHERE {where}",
+                args,
+            ).fetchone()["c"]
+            rows = conn.execute(
+                f"""
+                SELECT * FROM borrow_orders
+                WHERE {where}
+                ORDER BY maturity ASC, order_id DESC
+                LIMIT ? OFFSET ?
+                """,
+                [*args, limit, offset],
+            ).fetchall()
+
+        return [self._format_borrow_row(dict(row)) for row in rows], int(total)
+
+    def list_maker_supply_orders(
+        self,
+        app_address: str,
+        chain: str,
+        maker: str,
+        *,
+        page: int,
+        limit: int,
+        include_expired: bool = False,
+        include_closed: bool = False,
+    ) -> tuple[list[dict[str, Any]], int]:
+        app_address = app_address.lower()
+        chain = chain.lower()
+        maker = maker.lower()
+        offset = (page - 1) * limit
+        filters = ["app_address = ?", "chain = ?", "supplier = ?"]
+        args: list[Any] = [app_address, chain, maker]
+        if not include_closed:
+            filters.append("cancelled = 0")
+            filters.append(
+                "CAST(debt_token_in AS INTEGER) > CAST(filled_debt_token AS INTEGER)"
+            )
+        if not include_expired:
+            filters.append("deadline >= ?")
+            args.append(int(time.time()))
+        where = " AND ".join(filters)
+
+        with self._connect() as conn:
+            total = conn.execute(
+                f"SELECT COUNT(*) AS c FROM supply_orders WHERE {where}",
+                args,
+            ).fetchone()["c"]
+            rows = conn.execute(
+                f"""
+                SELECT * FROM supply_orders
+                WHERE {where}
+                ORDER BY maturity ASC, order_id DESC
                 LIMIT ? OFFSET ?
                 """,
                 [*args, limit, offset],

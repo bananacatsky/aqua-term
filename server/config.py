@@ -26,6 +26,7 @@ class AppConfig:
     address: str
     chain: str
     from_block: int
+    maturities: tuple[int, ...] = ()
 
 
 def parse_csv(raw: str) -> tuple[str, ...]:
@@ -39,12 +40,18 @@ def parse_apps(raw: str) -> tuple[AppConfig, ...]:
         if not item:
             continue
         parts = item.split(":")
-        if len(parts) != 3:
+        if len(parts) not in (3, 4):
             raise ValueError(
-                f"Invalid AQUATERM_APPS entry {item!r}; expected address:chain:from_block"
+                f"Invalid AQUATERM_APPS entry {item!r}; "
+                "expected address:chain:from_block[:maturity_ts,maturity_ts,...]"
             )
-        address, chain, from_block = parts
-        apps.append(AppConfig(address.lower(), chain.lower(), int(from_block)))
+        address, chain, from_block = parts[0], parts[1], parts[2]
+        maturities: tuple[int, ...] = ()
+        if len(parts) == 4 and parts[3].strip():
+            maturities = tuple(int(x.strip()) for x in parts[3].split(",") if x.strip())
+        apps.append(
+            AppConfig(address.lower(), chain.lower(), int(from_block), maturities)
+        )
     return tuple(apps)
 
 
