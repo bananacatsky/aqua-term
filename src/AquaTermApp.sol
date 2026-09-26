@@ -37,11 +37,11 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
     uint40[] internal supportedMaturities;
 
     struct BorrowOrder {
-        address borrower; uint40 maturity; uint128 faceAmount; uint128 minDebtTokenOut;
+        address borrower; uint40 maturity; uint40 deadline; uint128 faceAmount; uint128 minDebtTokenOut;
         uint16 ltvBps; uint256 collateralId; uint128 filledFace; bool cancelled;
     }
     struct SupplyOrder {
-        address supplier; uint40 maturity; uint128 debtTokenIn; uint128 minTermOut;
+        address supplier; uint40 maturity; uint40 deadline; uint128 debtTokenIn; uint128 minTermOut;
         uint128 filledDebtToken; bool cancelled;
     }
     struct MatchSettlement {
@@ -55,9 +55,9 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
     mapping(uint256 => BorrowOrder) public borrowOrders;
     mapping(uint256 => SupplyOrder) public supplyOrders;
 
-    event BorrowOrderCreated(uint256 indexed orderId, address indexed borrower, uint40 maturity, uint256 faceAmount, uint256 minDebtTokenOut, uint256 ltvBps, uint256 collateralId);
+    event BorrowOrderCreated(uint256 indexed orderId, address indexed borrower, uint40 maturity, uint40 deadline, uint256 faceAmount, uint256 minDebtTokenOut, uint256 ltvBps, uint256 collateralId);
     event CollateralPulled(address indexed borrower, uint256 indexed collateralId, uint256 amount);
-    event SupplyOrderCreated(uint256 indexed orderId, address indexed supplier, uint40 maturity, uint256 debtTokenIn, uint256 minTermOut);
+    event SupplyOrderCreated(uint256 indexed orderId, address indexed supplier, uint40 maturity, uint40 deadline, uint256 debtTokenIn, uint256 minTermOut);
     event OrdersMatched(
         uint256 indexed borrowOrderId,
         uint256 indexed supplyOrderId,
@@ -152,24 +152,26 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         return value == 0 ? (totalDebt[borrower] == 0 ? 0 : type(uint256).max) : totalDebt[borrower] * BPS / value;
     }
 
-    function createBorrowOrder(uint40 maturity, uint128 faceAmount, uint128 minDebtTokenOut, uint16 ltvBps, uint256 collateralId) external returns (uint256 orderId, bytes32 strategyHash) {
+    function createBorrowOrder(
+        uint40 maturity, uint128 faceAmount, uint128 minDebtTokenOut, uint16 ltvBps, uint256 collateralId, uint40 deadline
+    ) external returns (uint256 orderId, bytes32 strategyHash) {
         require(address(vaultForMaturity[maturity]) != address(0), "UNSUPPORTED_MATURITY");
         require(faceAmount != 0 && minDebtTokenOut != 0, "ZERO_ORDER");
         require(ltvBps != 0 && ltvBps <= BPS, "BAD_ORDER_LTV");
         require(collateralId < N_COLLATERAL, "BAD_COLLATERAL");
         orderId = nextBorrowOrderId++;
-        borrowOrders[orderId] = BorrowOrder(msg.sender, maturity, faceAmount, minDebtTokenOut, ltvBps, collateralId, 0, false);
+        borrowOrders[orderId] = BorrowOrder(msg.sender, maturity, deadline, faceAmount, minDebtTokenOut, ltvBps, collateralId, 0, false);
         strategyHash = borrowStrategyHash(orderId);
-        emit BorrowOrderCreated(orderId, msg.sender, maturity, faceAmount, minDebtTokenOut, ltvBps, collateralId);
+        emit BorrowOrderCreated(orderId, msg.sender, maturity, deadline, faceAmount, minDebtTokenOut, ltvBps, collateralId);
     }
 
-    function createSupplyOrder(uint40 maturity, uint128 debtTokenIn, uint128 minTermOut) external returns (uint256 orderId, bytes32 strategyHash) {
+    function createSupplyOrder(uint40 maturity, uint128 debtTokenIn, uint128 minTermOut, uint40 deadline) external returns (uint256 orderId, bytes32 strategyHash) {
         require(address(vaultForMaturity[maturity]) != address(0), "UNSUPPORTED_MATURITY");
         require(debtTokenIn != 0 && minTermOut != 0, "ZERO_ORDER");
         orderId = nextSupplyOrderId++;
-        supplyOrders[orderId] = SupplyOrder(msg.sender, maturity, debtTokenIn, minTermOut, 0, false);
+        supplyOrders[orderId] = SupplyOrder(msg.sender, maturity, deadline, debtTokenIn, minTermOut, 0, false);
         strategyHash = supplyStrategyHash(orderId);
-        emit SupplyOrderCreated(orderId, msg.sender, maturity, debtTokenIn, minTermOut);
+        emit SupplyOrderCreated(orderId, msg.sender, maturity, deadline, debtTokenIn, minTermOut);
     }
 
     function cancelBorrowOrder(uint256 id) external { require(borrowOrders[id].borrower == msg.sender, "NOT_BORROWER"); borrowOrders[id].cancelled = true; }
@@ -179,6 +181,7 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         BorrowOrder storage b = borrowOrders[borrowOrderId]; SupplyOrder storage s = supplyOrders[supplyOrderId];
         require(!b.cancelled && !s.cancelled, "CANCELLED");
         require(b.maturity == s.maturity && block.timestamp < b.maturity, "BAD_MATURITY");
+        require(block.timestamp <= b.deadline && block.timestamp <= s.deadline, "ORDER_EXPIRED");
         require(faceAmount != 0 && debtTokenAmount != 0, "ZERO_FILL");
         require(faceAmount <= uint256(b.faceAmount) - b.filledFace, "BORROW_OVERFILL");
         require(debtTokenAmount <= uint256(s.debtTokenIn) - s.filledDebtToken, "SUPPLY_OVERFILL");
@@ -367,8 +370,8 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         emit BadDebtMarked(borrower, maturity, amount);
     }
 
-    function borrowStrategyBytes(uint256 id) public view returns (bytes memory) { BorrowOrder memory b = borrowOrders[id]; return abi.encode(bytes32("AQUATERM_BORROW"), address(this), id, b.borrower, b.maturity, b.collateralId); }
+    function borrowStrategyBytes(uint256 id) public view returns (bytes memory) { BorrowOrder memory b = borrowOrders[id]; return abi.encode(bytes32("AQUATERM_BORROW"), address(this), id, b.borrower, b.maturity, b.deadline, b.collateralId); }
     function borrowStrategyHash(uint256 id) public view returns (bytes32) { return keccak256(borrowStrategyBytes(id)); }
-    function supplyStrategyBytes(uint256 id) public view returns (bytes memory) { SupplyOrder memory s = supplyOrders[id]; return abi.encode(bytes32("AQUATERM_SUPPLY"), address(this), id, s.supplier, s.maturity); }
+    function supplyStrategyBytes(uint256 id) public view returns (bytes memory) { SupplyOrder memory s = supplyOrders[id]; return abi.encode(bytes32("AQUATERM_SUPPLY"), address(this), id, s.supplier, s.maturity, s.deadline); }
     function supplyStrategyHash(uint256 id) public view returns (bytes32) { return keccak256(supplyStrategyBytes(id)); }
 }

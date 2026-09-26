@@ -36,6 +36,7 @@ contract AquaTermAppTest {
     Aqua internal aqua;
     AquaTermApp internal app;
     uint40 internal maturity;
+    uint40 internal orderDeadline;
 
     uint256 internal constant FACE = 500e6;
     uint256 internal constant SPOT = 480e6;
@@ -66,6 +67,7 @@ contract AquaTermAppTest {
         aqua = new Aqua();
 
         maturity = uint40(block.timestamp + 30 days);
+        orderDeadline = maturity;
         IERC20[] memory collateral = new IERC20[](3);
         collateral[0] = IERC20(address(weth)); collateral[1] = IERC20(address(wbtc)); collateral[2] = IERC20(address(alt));
         uint16[] memory maxLtvs = new uint16[](3); maxLtvs[0] = 7000; maxLtvs[1] = 6500; maxLtvs[2] = 5000;
@@ -101,8 +103,8 @@ contract AquaTermAppTest {
     function _shipAndMatchWithCollateral(uint256 face, uint256 spot, uint16 ltvBps, uint256 collateralId)
         internal returns (AquaTermVault vault)
     {
-        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(spot), ltvBps, collateralId);
-        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(spot), uint128(face));
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(spot), ltvBps, collateralId, orderDeadline);
+        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(spot), uint128(face), orderDeadline);
         vault = app.vaultForMaturity(maturity);
         vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
         _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(face));
@@ -138,8 +140,8 @@ contract AquaTermAppTest {
         uint256 face = 110e6;
         uint256 debtTokenIn = 100e6;
         uint256 supplierMinTerm = 105e6;
-        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(debtTokenIn), 6000, 0);
-        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(debtTokenIn), uint128(supplierMinTerm));
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(debtTokenIn), 6000, 0, orderDeadline);
+        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(debtTokenIn), uint128(supplierMinTerm), orderDeadline);
         AquaTermVault vault = app.vaultForMaturity(maturity);
         vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
         _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(face));
@@ -147,8 +149,8 @@ contract AquaTermAppTest {
 
         vm.prank(matcher); app.matchOrders(bId, sId, face, debtTokenIn);
 
-        (,,,,,, uint128 filledFace,) = app.borrowOrders(bId);
-        (,,,, uint128 filledDebtToken,) = app.supplyOrders(sId);
+        (,,,,,,, uint128 filledFace,) = app.borrowOrders(bId);
+        (,,,,, uint128 filledDebtToken,) = app.supplyOrders(sId);
         _assertEq(filledFace, face, "borrow order fully closed");
         _assertEq(filledDebtToken, debtTokenIn, "supply order fully closed");
         _assertEq(debtToken.balanceOf(borrower), debtTokenIn, "borrower receives its limit");
@@ -161,8 +163,8 @@ contract AquaTermAppTest {
         uint256 face = 105e6;
         uint256 borrowerMinDebtToken = 95e6;
         uint256 debtTokenIn = 100e6;
-        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(borrowerMinDebtToken), 6000, 0);
-        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(debtTokenIn), uint128(face));
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(borrowerMinDebtToken), 6000, 0, orderDeadline);
+        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(debtTokenIn), uint128(face), orderDeadline);
         AquaTermVault vault = app.vaultForMaturity(maturity);
         vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
         _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(face));
@@ -170,8 +172,8 @@ contract AquaTermAppTest {
 
         vm.prank(matcher); app.matchOrders(bId, sId, face, debtTokenIn);
 
-        (,,,,,, uint128 filledFace,) = app.borrowOrders(bId);
-        (,,,, uint128 filledDebtToken,) = app.supplyOrders(sId);
+        (,,,,,,, uint128 filledFace,) = app.borrowOrders(bId);
+        (,,,,, uint128 filledDebtToken,) = app.supplyOrders(sId);
         _assertEq(filledFace, face, "borrow order fully closed");
         _assertEq(filledDebtToken, debtTokenIn, "supply order fully closed");
         _assertEq(debtToken.balanceOf(borrower), borrowerMinDebtToken, "borrower receives its limit");
@@ -224,8 +226,8 @@ contract AquaTermAppTest {
 
     function testOverCapacityFillRevertsAtomically() public {
         _shipAndMatch(FACE, SPOT);
-        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, 600e6, 576e6, 6000, 0);
-        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, 576e6, 600e6);
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, 600e6, 576e6, 6000, 0, orderDeadline);
+        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, 576e6, 600e6, orderDeadline);
         AquaTermVault vault = app.vaultForMaturity(maturity);
         _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(600e6));
         _ship(supplier, app.supplyStrategyBytes(sId), address(debtToken), 576e6);
@@ -297,22 +299,45 @@ contract AquaTermAppTest {
         require(oracle.valueInDebtToken(address(weth), seized) > FACE, "liquidator receives liquidation profit");
     }
 
+    function testLiquidationWithFullDiscountWritesDownRemainingBadDebt() public {
+        uint256 face = 100e6;
+        uint256 spot = 98e6;
+        uint256 repayAmount = 50e6;
+        uint256 discountBps = 500;
+        AquaTermVault vault = _shipAndMatchWithCollateral(face, spot, 6000, 0);
+
+        uint256 collateral = app.depositedCollateral(borrower, 0);
+        uint256 collateralValueNeeded = (repayAmount * 10_000 + (10_000 - discountBps) - 1) / (10_000 - discountBps);
+        uint256 valueAtPar = oracle.valueInDebtToken(address(weth), collateral);
+        ethFeed.setAnswer(int256(uint256(1000e8) * collateralValueNeeded / valueAtPar));
+
+        address liquidator = address(0x11A);
+        debtToken.mint(liquidator, repayAmount);
+        vm.prank(liquidator); debtToken.approve(address(app), repayAmount);
+        vm.prank(liquidator);
+        uint256 seized = app.liquidate(borrower, maturity, 0, repayAmount, "");
+
+        uint256 seizedValue = oracle.valueInDebtToken(address(weth), seized);
+        uint256 expectedProfit = repayAmount * discountBps / (10_000 - discountBps);
+        _assertEq(seized, collateral, "liquidation consumes all remaining collateral");
+        _assertEq(seizedValue - repayAmount, expectedProfit, "liquidator earns configured discount");
+        _assertEq(debtToken.balanceOf(liquidator), 0, "liquidator funds repayment");
+
+        uint256 expectedBadDebt = face - repayAmount;
+        _assertEq(app.depositedCollateral(borrower, 0), 0, "borrower has no collateral left");
+        _assertEq(app.debtByVault(borrower, address(vault)), expectedBadDebt, "borrower still owes residual debt");
+        _assertEq(vault.badDebt(), expectedBadDebt, "residual performing debt is written down");
+        _assertEq(vault.totalAssets(), repayAmount, "NAV reflects repayment minus written-down debt");
+    }
+
     function testBadDebtLossStaysWithLegacySupplierCohort() public {
         uint256 oldFace = 100e6;
         uint256 oldSpot = 98e6;
         AquaTermVault vault = _shipAndMatchWithCollateral(oldFace, oldSpot, 6000, 0);
 
-        // The collateral falls below the amount needed to cover the liquidation at the fixed discount.
+        // Collateral is worth less than debtAmount / (1 - discount), so the liquidator seizes all of it.
         ethFeed.setAnswer(600e8);
-        address liquidator = address(0x11A);
-        uint256 recovered = 98e6;
-        debtToken.mint(liquidator, recovered);
-        vm.prank(liquidator); debtToken.approve(address(app), recovered);
-        vm.prank(liquidator); app.liquidate(borrower, maturity, 0, recovered, "");
-
-        _assertEq(app.debtByVault(borrower, address(vault)), 2e6, "uncovered residual borrower debt remains");
-        _assertEq(app.depositedCollateral(borrower, 0), 0, "liquidation exhausted borrower collateral");
-        _assertEq(vault.badDebt(), 2e6, "uncovered debt is written down once");
+        _liquidateBadDebtAndAssertLiquidatorReward(vault, 98e6, 2e6);
         _assertEq(vault.totalAssets(), 98e6, "legacy NAV reflects loss");
         _assertEq(vault.balanceOf(supplier), oldFace, "legacy cohort keeps original shares");
 
@@ -327,10 +352,10 @@ contract AquaTermAppTest {
         uint256 newFace = 100e6;
         uint256 newSpot = 98e6;
         vm.prank(laterBorrower);
-        (uint256 bId,) = app.createBorrowOrder(maturity, uint128(newFace), uint128(newSpot), 6000, 0);
+        (uint256 bId,) = app.createBorrowOrder(maturity, uint128(newFace), uint128(newSpot), 6000, 0, orderDeadline);
         uint256 newShares = vault.previewDebtShares(newFace);
         vm.prank(laterSupplier);
-        (uint256 sId,) = app.createSupplyOrder(maturity, uint128(newSpot), uint128(newShares));
+        (uint256 sId,) = app.createSupplyOrder(maturity, uint128(newSpot), uint128(newShares), orderDeadline);
         vm.prank(laterBorrower); vault.approve(address(aqua), type(uint256).max);
         _ship(laterBorrower, app.borrowStrategyBytes(bId), address(vault), newShares);
         _ship(laterSupplier, app.supplyStrategyBytes(sId), address(debtToken), newSpot);
@@ -357,6 +382,19 @@ contract AquaTermAppTest {
         require(latePayout >= 100e6 - 2 && latePayout <= 100e6 + 2, "late cohort exits at par");
     }
 
+    function testExpiredOrderCannotBeMatched() public {
+        uint40 shortDeadline = uint40(block.timestamp + 7 days);
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(FACE), uint128(SPOT), 6000, 0, shortDeadline);
+        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(SPOT), uint128(FACE), shortDeadline);
+        AquaTermVault vault = app.vaultForMaturity(maturity);
+        vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
+        _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(FACE));
+        _ship(supplier, app.supplyStrategyBytes(sId), address(debtToken), SPOT);
+        vm.warp(shortDeadline + 1);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "ORDER_EXPIRED"));
+        app.matchOrders(bId, sId, FACE, SPOT);
+    }
+
     function testChainlinkOracleUsesDecimalsAndUSDTPrice() public {
         _assertEq(oracle.valueInDebtToken(address(weth), 1e18), 1000e6, "WETH value");
         _assertEq(oracle.valueInDebtToken(address(wbtc), 1e8), 100_000e6, "WBTC value");
@@ -371,6 +409,24 @@ contract AquaTermAppTest {
         ethFeed.setAnswer(-1);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "INVALID_FEED_ANSWER"));
         oracle.valueInDebtToken(address(weth), 1e18);
+    }
+
+    function _liquidateBadDebtAndAssertLiquidatorReward(AquaTermVault vault, uint256 repayAmount, uint256 expectedBadDebt)
+        internal
+    {
+        address liquidator = address(0x11A);
+        debtToken.mint(liquidator, repayAmount);
+        vm.prank(liquidator); debtToken.approve(address(app), repayAmount);
+        vm.prank(liquidator);
+        uint256 seized = app.liquidate(borrower, maturity, 0, repayAmount, "");
+
+        uint256 collateralValue = oracle.valueInDebtToken(address(weth), seized);
+        require(collateralValue > repayAmount, "liquidator receives collateral worth more than repayment");
+        _assertEq(collateralValue - repayAmount, expectedBadDebt, "liquidator keeps collateral surplus over repayment");
+        _assertEq(debtToken.balanceOf(liquidator), 0, "liquidator funds repayment");
+        _assertEq(app.debtByVault(borrower, address(vault)), expectedBadDebt, "uncovered residual borrower debt remains");
+        _assertEq(app.depositedCollateral(borrower, 0), 0, "liquidation exhausted borrower collateral");
+        _assertEq(vault.badDebt(), expectedBadDebt, "uncovered debt is written down once");
     }
 
     function _assertEq(uint256 a, uint256 b, string memory reason) internal pure { require(a == b, reason); }
