@@ -30,12 +30,13 @@
   </nav>
   <div class="wallet"><span id="wallet-network" class="network">Ethereum</span><span id="api-status" class="api-status">API: connecting…</span><button id="connect-wallet" class="wallet-btn" type="button">Connect wallet</button><button id="disconnect-wallet" class="wallet-btn" type="button" style="display:none">Disconnect</button></div>
 </header>
-<section id="portfolio" class="page"><div class="page-head"><div><div class="eyebrow">Portfolio</div><h1>Your portfolio</h1><div class="sub">Your wallet, borrowing risk, debts, lending positions and collateral in one place.</div></div><div class="split-actions"><button class="btn btn-secondary">Withdraw collateral</button><button class="btn btn-primary">Deposit collateral</button></div></div><div id="portfolio-connect-message" class="connect-message"><button id="portfolio-connect-button" class="btn btn-primary connect-wallet-large" type="button">Connect wallet</button></div>
+<section id="portfolio" class="page"><div class="page-head"><div><div class="eyebrow">Portfolio</div><h1>Your portfolio</h1><div class="sub">Your wallet, borrowing risk, debts, lending positions and collateral in one place.</div></div><div class="split-actions"><button class="btn btn-secondary">Withdraw collateral</button><button id="open-deposit-collateral" class="btn btn-primary" type="button">Deposit collateral</button></div></div><div id="portfolio-connect-message" class="connect-message"><button id="portfolio-connect-button" class="btn btn-primary connect-wallet-large" type="button">Connect wallet</button></div>
 <section class="grid grid-4"><div class="card metric"><div class="label">Wallet balance</div><div id="wallet-balance-value" class="value"></div><div class="hint">USDT + WETH + WBTC</div></div><div class="card metric"><div class="label">Total debt</div><div id="debt-value" class="value"></div><div class="hint">Across active debts</div></div><div class="card metric"><div class="label">Collateral</div><div id="collateral-value" class="value"></div><div class="hint">Deposited in AquaTerm</div></div><div class="card metric orange-card"><div class="label">Health factor</div><div id="health-factor-value" class="value"></div><div class="hint"><span id="health-status-pill" class="pill"></span></div></div></section>
 <section class="card section"><div class="section-head"><h2>Borrowing health</h2><span id="health-status-section" class="pill"></span></div><div class="section-body"><div class="grid grid-4"><div class="metric" style="padding:0"><div class="label">Current LTV</div><div id="current-ltv-value" class="value"></div></div><div class="metric" style="padding:0"><div class="label">Borrow limit</div><div id="borrow-limit-value" class="value"></div></div><div class="metric" style="padding:0"><div class="label">Liquidation limit</div><div id="liquidation-limit-value" class="value"></div></div><div class="metric" style="padding:0"><div class="label">Health factor</div><div id="health-factor-risk-value" class="value"></div></div></div><div class="riskbar"><span id="riskbar-value"></span></div><div id="health-description" class="muted"></div></div></section>
 <section class="card section"><div class="section-head"><h2>My debts</h2><button class="btn btn-secondary" data-route="create-order">Create borrow order</button></div><div id="debts-list" class="section-body"></div></section>
 <section class="card section"><div class="section-head"><h2>My lending positions</h2><button class="btn btn-secondary" data-route="create-order">Create supply order</button></div><div id="lending-list" class="section-body"></div></section>
 <section class="grid grid-2 section"><div class="card"><div class="section-head"><h2>Collateral</h2><span class="muted">Securing your debts</span></div><div id="collateral-list" class="section-body"></div></div><div class="card"><div class="section-head"><h2>Wallet balances</h2><span class="muted">Available in wallet</span></div><div id="wallet-list" class="section-body"></div></div></section>
+<section class="card section"><div class="section-head"><h2>Collateral actions</h2><span class="muted">WETH / WBTC</span></div><div class="section-body"><div class="field-row"><div class="field" style="margin-top:0"><label>Token</label><select id="deposit-token-select" class="select"></select></div><div class="field" style="margin-top:0"><label>Wallet balance</label><div id="deposit-token-balance" class="input"></div></div></div><div class="field"><label>Amount</label><input id="deposit-amount" class="input" type="text" inputmode="decimal" value=""></div><div class="split-actions"><button id="approve-collateral-button" class="btn btn-secondary" type="button">Approve token</button><button id="deposit-collateral-button" class="btn btn-primary" type="button">Deposit</button></div></div></section>
 <section class="card section"><div class="section-head"><h2>My open orders</h2></div><div id="open-orders-list" class="section-body"></div></section></section>
 <section id="orders" class="page"><div class="page-head"><div><div class="eyebrow">Order book</div><h1>Maturity markets</h1><div class="sub">Lenders and borrowers meet in one rate ladder for each maturity. Anyone can execute a compatible match and keep the full spread between both limit rates.</div></div></div>
 <div class="maturity-tabs"><button class="maturity-tab active" data-month="oct"></button><button class="maturity-tab" data-month="nov"></button><button class="maturity-tab" data-month="dec"></button><button class="maturity-tab" data-month="jan"></button></div>
@@ -122,6 +123,52 @@ connectButton.addEventListener('click', connectWallet);
 portfolioConnectButton.addEventListener('click', connectWallet);
 createOrderConnectButton.addEventListener('click', connectWallet);
 disconnectButton.addEventListener('click', disconnectWallet);
+
+const depositTokenSelect=document.getElementById('deposit-token-select');
+const depositAmountInput=document.getElementById('deposit-amount');
+const approveCollateralButton=document.getElementById('approve-collateral-button');
+const depositCollateralButton=document.getElementById('deposit-collateral-button');
+const openDepositCollateralButton=document.getElementById('open-deposit-collateral');
+
+async function refreshPortfolioAfterTransaction(){
+  if(walletAddress) await AquaApi.loadForAddress(walletAddress);
+}
+
+async function approveCollateral(){
+  const token=AquaApi.selectedCollateral();
+  const amount=depositAmountInput.value.trim();
+  if(!token || !amount || !walletSigner) return;
+  await AquaWeb3.writeContract({
+    address:token.address,
+    abi:AquaConfig.AquaABIs.erc20,
+    functionName:'approve',
+    args:[AquaConfig.AquaContracts[AquaConfig.AQUA_CHAIN].app,AquaWeb3.parseTokenAmount(amount,token.decimals)],
+    label:`Approve ${token.symbol}`,
+  });
+  await refreshPortfolioAfterTransaction();
+}
+
+async function depositCollateral(){
+  const token=AquaApi.selectedCollateral();
+  const amount=depositAmountInput.value.trim();
+  if(!token || !amount || !walletSigner) return;
+  await AquaWeb3.writeContract({
+    contractKey:'app',
+    abi:AquaConfig.AquaABIs.app,
+    functionName:'depositCollateral',
+    args:[token.id,AquaWeb3.parseTokenAmount(amount,token.decimals)],
+    label:`Deposit ${token.symbol}`,
+  });
+  await refreshPortfolioAfterTransaction();
+}
+
+depositTokenSelect.addEventListener('change',()=>AquaApi.updateDepositBalance());
+openDepositCollateralButton.addEventListener('click',()=>{
+  document.getElementById('deposit-token-select').scrollIntoView({behavior:'smooth',block:'center'});
+  depositAmountInput.focus();
+});
+approveCollateralButton.addEventListener('click',()=>approveCollateral().catch(error=>console.warn('Approve failed:',error)));
+depositCollateralButton.addEventListener('click',()=>depositCollateral().catch(error=>console.warn('Deposit failed:',error)));
 
 if(window.ethereum){
   window.ethereum.on('accountsChanged', accounts=>{
