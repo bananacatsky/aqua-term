@@ -196,6 +196,43 @@ contract AquaTermAppTest {
         _assertEq(weth.balanceOf(borrower), 166_666_666_000_000_000, "only shortfall taken");
     }
 
+    function testOrderLtvPullsExactCollateral() public {
+        uint256 face = 300e6;
+        uint256 spot = 288e6;
+        uint16 orderLtvBps = 3000;
+        _shipAndMatchWithCollateral(face, spot, orderLtvBps, 0);
+        _assertEq(app.depositedCollateral(borrower, 0), 1e18, "30% LTV pulls exactly 1 WETH");
+        _assertEq(weth.balanceOf(borrower), 0, "wallet fully consumed");
+        _assertEq(app.totalDebt(borrower), face, "debt matches face");
+        _assertEq(app.currentLtv(borrower), orderLtvBps, "resulting LTV equals order limit");
+    }
+
+    function testSecondOrderWithExcessCollateralPullsNothing() public {
+        uint256 firstFace = 500e6;
+        uint256 firstSpot = 480e6;
+        vm.prank(borrower); app.depositCollateral(0, 1e18);
+        _shipAndMatchWithCollateral(firstFace, firstSpot, 6000, 0);
+        _assertEq(app.currentLtv(borrower), 5000, "first loan sits at 50% LTV");
+        uint256 depositedBefore = app.depositedCollateral(borrower, 0);
+        uint256 walletBefore = weth.balanceOf(borrower);
+
+        uint256 secondFace = 100e6;
+        uint256 secondSpot = 96e6;
+        vm.prank(borrower);
+        (uint256 bId,) = app.createBorrowOrder(maturity, uint128(secondFace), uint128(secondSpot), 7000, 0, orderDeadline);
+        vm.prank(supplier);
+        (uint256 sId,) = app.createSupplyOrder(maturity, uint128(secondSpot), uint128(secondFace), orderDeadline);
+        AquaTermVault vault = app.vaultForMaturity(maturity);
+        _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(secondFace));
+        _ship(supplier, app.supplyStrategyBytes(sId), address(debtToken), secondSpot);
+        app.matchOrders(bId, sId, secondFace, secondSpot);
+
+        _assertEq(app.depositedCollateral(borrower, 0), depositedBefore, "no additional collateral locked");
+        _assertEq(weth.balanceOf(borrower), walletBefore, "no wallet transfer on second fill");
+        _assertEq(app.totalDebt(borrower), firstFace + secondFace, "debt increased by second face");
+        _assertEq(app.currentLtv(borrower), 6000, "second fill lands at 60% LTV");
+    }
+
     function testChosenTokenAndProtocolLtvLimit() public {
         wbtc.mint(borrower, 1e6);
         vm.prank(borrower); wbtc.approve(address(app), type(uint256).max);
