@@ -36,6 +36,7 @@ The app values only collateral already held for a borrower; wallet balances do n
 
 ```text
 token maxBorrowLtvBps < token liquidationLtvBps <= 10,000
+token liquidationDiscountBps in (0, 10,000)
 ```
 
 At a fill, let `newDebt` be the borrower's total face debt across all maturities after the proposed fill. Let `value[i]` be the current USDT value of collateral token `i` already deposited for that borrower. The borrower's order LTV is a ceiling on the resulting portfolio ratio; it is not an instruction to transfer a fixed amount of collateral.
@@ -105,13 +106,13 @@ After maturity, holders may use ERC-4626 `withdraw` or `redeem`, limited by actu
 
 ## 6. Liquidation and bad debt
 
-Any account may liquidate a borrower whose portfolio health factor is below 1. A liquidation targets one maturity's debt and one of the borrower's collateral tokens:
+Any account may liquidate a borrower whose portfolio health factor is below 1. Once a maturity has passed, its outstanding debt is liquidatable even when the borrower remains healthy. A liquidation targets one maturity's debt and one of the borrower's collateral tokens:
 
 ```text
-require healthFactor(borrower) < 1
+require block.timestamp >= maturity || healthFactor(borrower) < 1
 require 0 < debtAmount <= borrower's debt for the chosen maturity
 
-discount = min(15%, 5% + (1 - healthFactor))
+discount = liquidationDiscountBps for the chosen collateral token
 collateralValueToSeize = debtAmount / (1 - discount)
 collateralToSeize = min(
     collateral token amount worth collateralValueToSeize,
@@ -133,4 +134,4 @@ Bad debt reduces vault net asset value and shares the loss across that maturity'
 
 The MVP still has no matching service, variable rates, second debt asset, governance or insurance. Aqua supplies virtual balance accounting and token transfer operations; AquaTerm supplies the loan, collateral, price, maturity and liquidation rules.
 
-All permanent configuration is set at deployment: Aqua, USDT, oracle, supported maturities, collateral tokens and their borrow/liquidation LTV limits. The app has no owner or admin setters.
+All permanent configuration is set at deployment: Aqua, USDT, oracle, supported maturities, collateral tokens and their borrow/liquidation LTV limits and liquidation discounts. The app has no owner or admin setters.

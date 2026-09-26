@@ -70,10 +70,14 @@ contract AquaTermAppTest {
         collateral[0] = IERC20(address(weth)); collateral[1] = IERC20(address(wbtc)); collateral[2] = IERC20(address(alt));
         uint16[] memory maxLtvs = new uint16[](3); maxLtvs[0] = 7000; maxLtvs[1] = 6500; maxLtvs[2] = 5000;
         uint16[] memory liqLtvs = new uint16[](3); liqLtvs[0] = 8000; liqLtvs[1] = 7500; liqLtvs[2] = 6000;
+        uint16[] memory liqDiscounts = new uint16[](3); liqDiscounts[0] = 500; liqDiscounts[1] = 500; liqDiscounts[2] = 500;
         uint40[] memory maturities = new uint40[](1); maturities[0] = maturity;
         string[] memory names = new string[](1); names[0] = "AquaTerm USDT";
         string[] memory symbols = new string[](1); symbols[0] = "USDT-TERM";
-        app = new AquaTermApp(IAqua(address(aqua)), IERC20(address(debtToken)), oracle, collateral, maxLtvs, liqLtvs, maturities, names, symbols);
+        app = new AquaTermApp(
+            IAqua(address(aqua)), IERC20(address(debtToken)), oracle, collateral, maxLtvs, liqLtvs, liqDiscounts,
+            maturities, names, symbols
+        );
 
         weth.mint(borrower, 1e18);
         alt.mint(borrower, 1e18);
@@ -272,12 +276,33 @@ contract AquaTermAppTest {
         _assertEq(debtToken.balanceOf(liquidator), 0, "liquidator funds repayment");
     }
 
+    function testMaturedHealthyBorrowerCanBeLiquidatedForLiquidatorProfit() public {
+        AquaTermVault vault = _shipAndMatch(FACE, SPOT);
+        require(app.healthFactor(borrower) > 1e18, "borrower should be healthy before maturity");
+        vm.warp(maturity);
+        ethFeed.setAnswer(1000e8);
+        btcFeed.setAnswer(100_000e8);
+        altFeed.setAnswer(2e8);
+        debtTokenFeed.setAnswer(1e8);
+
+        address liquidator = address(0x11A);
+        debtToken.mint(liquidator, FACE);
+        vm.prank(liquidator); debtToken.approve(address(app), FACE);
+        vm.prank(liquidator); app.liquidate(borrower, maturity, 0, FACE, "");
+
+        _assertEq(app.totalDebt(borrower), 0, "matured debt is liquidated");
+        _assertEq(vault.totalAssets(), FACE, "vault receives the matured debt payment");
+        uint256 seized = weth.balanceOf(liquidator);
+        require(seized != 0, "liquidator receives collateral");
+        require(oracle.valueInDebtToken(address(weth), seized) > FACE, "liquidator receives liquidation profit");
+    }
+
     function testBadDebtLossStaysWithLegacySupplierCohort() public {
         uint256 oldFace = 100e6;
         uint256 oldSpot = 98e6;
         AquaTermVault vault = _shipAndMatchWithCollateral(oldFace, oldSpot, 6000, 0);
 
-        // The collateral falls below the amount needed to cover the liquidation at the maximum discount.
+        // The collateral falls below the amount needed to cover the liquidation at the fixed discount.
         ethFeed.setAnswer(600e8);
         address liquidator = address(0x11A);
         uint256 recovered = 98e6;

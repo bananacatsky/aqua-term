@@ -18,13 +18,15 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
     using SafeERC20 for IERC20;
     uint256 internal constant BPS = 10_000;
     uint256 internal constant WAD = 1e18;
-    uint256 public constant LIQUIDATION_DISCOUNT_MIN_BPS = 500;
-    uint256 public constant LIQUIDATION_DISCOUNT_MAX_BPS = 1_500;
-
     IERC20 public immutable debtToken;
     IOracle public immutable oracle;
 
-    struct CollateralConfig { IERC20 token; uint16 maxBorrowLtvBps; uint16 liquidationLtvBps; }
+    struct CollateralConfig {
+        IERC20 token;
+        uint16 maxBorrowLtvBps;
+        uint16 liquidationLtvBps;
+        uint16 liquidationDiscountBps;
+    }
     CollateralConfig[] public collateralConfigs;
     uint256 public immutable N_COLLATERAL;
     mapping(uint40 => AquaTermVault) public vaultForMaturity;
@@ -79,18 +81,26 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
 
     constructor(
         IAqua aqua_, IERC20 debtToken_, IOracle oracle_, IERC20[] memory collateralTokens,
-        uint16[] memory maxBorrowLtvs, uint16[] memory liquidationLtvs,
+        uint16[] memory maxBorrowLtvs, uint16[] memory liquidationLtvs, uint16[] memory liquidationDiscountBps,
         uint40[] memory maturities, string[] memory names, string[] memory symbols
     ) AquaApp(aqua_) {
         require(maturities.length == names.length && maturities.length == symbols.length, "BAD_MATURITY_CONFIG");
-        require(collateralTokens.length != 0 && collateralTokens.length == maxBorrowLtvs.length && collateralTokens.length == liquidationLtvs.length, "BAD_COLLATERAL_CONFIG");
+        require(
+            collateralTokens.length != 0 && collateralTokens.length == maxBorrowLtvs.length
+                && collateralTokens.length == liquidationLtvs.length
+                && collateralTokens.length == liquidationDiscountBps.length,
+            "BAD_COLLATERAL_CONFIG"
+        );
         debtToken = debtToken_; oracle = oracle_;
         N_COLLATERAL = collateralTokens.length;
         for (uint256 i; i < N_COLLATERAL; ++i) {
             require(maxBorrowLtvs[i] != 0 && maxBorrowLtvs[i] < liquidationLtvs[i] && liquidationLtvs[i] <= BPS, "BAD_LTV_CONFIG");
+            require(liquidationDiscountBps[i] != 0 && liquidationDiscountBps[i] < BPS, "BAD_LIQUIDATION_DISCOUNT");
             require(address(collateralTokens[i]) != address(0), "ZERO_COLLATERAL");
             for (uint256 j; j < i; ++j) require(address(collateralTokens[j]) != address(collateralTokens[i]), "DUPLICATE_COLLATERAL");
-            collateralConfigs.push(CollateralConfig(collateralTokens[i], maxBorrowLtvs[i], liquidationLtvs[i]));
+            collateralConfigs.push(
+                CollateralConfig(collateralTokens[i], maxBorrowLtvs[i], liquidationLtvs[i], liquidationDiscountBps[i])
+            );
         }
         for (uint256 i; i < maturities.length; ++i) {
             require(address(vaultForMaturity[maturities[i]]) == address(0), "DUPLICATE_MATURITY");
@@ -263,7 +273,7 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         vault.recordRepayment(amount, recovered);
     }
 
-    /// @notice Repays one maturity debt and seizes discounted collateral from an unhealthy borrower.
+    /// @notice Repays one maturity debt and seizes discounted collateral from an unhealthy or matured borrower.
     /// @dev The callback may swap seized collateral and approve the debt token back to this app for repayment.
     function liquidate(
         address borrower,
@@ -276,12 +286,12 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         AquaTermVault vault = vaultForMaturity[maturity];
         require(address(vault) != address(0), "UNSUPPORTED_MATURITY");
         uint256 health = healthFactor(borrower);
-        require(health < WAD, "NOT_LIQUIDATABLE");
+        require(block.timestamp >= maturity || health < WAD, "NOT_LIQUIDATABLE");
 
         uint256 borrowerDebt = debtByVault[borrower][address(vault)];
         require(debtAmount != 0 && debtAmount <= borrowerDebt, "TOO_MUCH");
         uint256 availableCollateral = depositedCollateral[borrower][collateralId];
-        collateralSeized = _liquidationCollateralAmount(collateralId, debtAmount, health, availableCollateral);
+        collateralSeized = _liquidationCollateralAmount(collateralId, debtAmount, availableCollateral);
         require(collateralSeized != 0, "NO_COLLATERAL_TO_SEIZE");
 
         debtByVault[borrower][address(vault)] = borrowerDebt - debtAmount;
@@ -305,11 +315,10 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         emit Liquidated(msg.sender, borrower, maturity, collateralId, debtAmount, collateralSeized, badDebtAdded);
     }
 
-    function _liquidationCollateralAmount(uint256 collateralId, uint256 debtAmount, uint256 health, uint256 available)
+    function _liquidationCollateralAmount(uint256 collateralId, uint256 debtAmount, uint256 available)
         internal view returns (uint256)
     {
-        uint256 shortfallBps = Math.mulDiv(WAD - health, BPS, WAD);
-        uint256 discountBps = Math.min(LIQUIDATION_DISCOUNT_MAX_BPS, LIQUIDATION_DISCOUNT_MIN_BPS + shortfallBps);
+        uint256 discountBps = collateralConfigs[collateralId].liquidationDiscountBps;
         uint256 collateralValueNeeded = Math.mulDiv(debtAmount, BPS, BPS - discountBps, Math.Rounding.Ceil);
         IERC20 token = collateralConfigs[collateralId].token;
         uint8 decimals = IERC20Metadata(address(token)).decimals();
