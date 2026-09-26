@@ -129,6 +129,52 @@ contract AquaTermAppTest {
         _assertEq(usdt.balanceOf(supplier), 2_000e6 + 20e6, "supplier earns discount");
     }
 
+    function testFullOrdersPayTermShareSpreadToMatcher() public {
+        address matcher = address(0xA11CE);
+        uint256 face = 110e6;
+        uint256 usdtIn = 100e6;
+        uint256 supplierMinTerm = 105e6;
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(usdtIn), 6000, 0);
+        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(usdtIn), uint128(supplierMinTerm));
+        AquaTermVault vault = app.vaultForMaturity(maturity);
+        vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
+        _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(face));
+        _ship(supplier, app.supplyStrategyBytes(sId), address(usdt), usdtIn);
+
+        vm.prank(matcher); app.matchOrders(bId, sId, face, usdtIn);
+
+        (,,,,,, uint128 filledFace,) = app.borrowOrders(bId);
+        (,,,, uint128 filledUsdt,) = app.supplyOrders(sId);
+        _assertEq(filledFace, face, "borrow order fully closed");
+        _assertEq(filledUsdt, usdtIn, "supply order fully closed");
+        _assertEq(usdt.balanceOf(borrower), usdtIn, "borrower receives its limit");
+        _assertEq(vault.balanceOf(supplier), supplierMinTerm, "supplier receives its limit");
+        _assertEq(vault.balanceOf(matcher), face - supplierMinTerm, "matcher receives term-share spread");
+    }
+
+    function testFullOrdersPayUsdtSpreadToMatcher() public {
+        address matcher = address(0xA11CE);
+        uint256 face = 105e6;
+        uint256 borrowerMinUsdt = 95e6;
+        uint256 usdtIn = 100e6;
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(borrowerMinUsdt), 6000, 0);
+        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(usdtIn), uint128(face));
+        AquaTermVault vault = app.vaultForMaturity(maturity);
+        vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
+        _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(face));
+        _ship(supplier, app.supplyStrategyBytes(sId), address(usdt), usdtIn);
+
+        vm.prank(matcher); app.matchOrders(bId, sId, face, usdtIn);
+
+        (,,,,,, uint128 filledFace,) = app.borrowOrders(bId);
+        (,,,, uint128 filledUsdt,) = app.supplyOrders(sId);
+        _assertEq(filledFace, face, "borrow order fully closed");
+        _assertEq(filledUsdt, usdtIn, "supply order fully closed");
+        _assertEq(usdt.balanceOf(borrower), borrowerMinUsdt, "borrower receives its limit");
+        _assertEq(vault.balanceOf(supplier), face, "supplier receives its limit");
+        _assertEq(usdt.balanceOf(matcher), usdtIn - borrowerMinUsdt, "matcher receives USDT spread");
+    }
+
     function testExistingCollateralNeedsNoAdditionalWalletTransfer() public {
         vm.prank(borrower); app.depositCollateral(0, 1e18);
         _assertEq(weth.balanceOf(borrower), 0, "collateral deposited in advance");

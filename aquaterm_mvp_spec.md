@@ -70,7 +70,9 @@ Any caller may propose two order IDs and fill amounts. The app performs the foll
 ```text
 require both orders active and for the same unexpired maturity
 require positive amounts within both orders' unfilled balances
-require both parties' minimum exchange rates are satisfied
+borrowerUsdtOut = ceil(borrowOrder.minUsdtOut * faceAmount / borrowOrder.faceAmount)
+supplierTermShares = ceil(supplyOrder.minTermOut * usdtAmount / supplyOrder.usdtIn)
+require usdtAmount >= borrowerUsdtOut
 
 newDebt = borrower.totalDebt + faceAmount
 count the borrower's existing deposits across all configured collateral tokens
@@ -80,12 +82,14 @@ recheck order LTV and protocol borrowing limit
 record the new borrower debt, globally and for this maturity vault
 shares = vault.previewDebtShares(faceAmount) // current NAV before this loan is added
 mint shares to the borrower against the new faceAmount receivable
-Aqua.pull shares from borrower to supplier
-Aqua.pull spot USDT from supplier to borrower
+Aqua.pull supplierTermShares from borrower to supplier
+Aqua.pull (shares - supplierTermShares) from borrower to msg.sender
+Aqua.pull borrowerUsdtOut from supplier to borrower
+Aqua.pull (usdtAmount - borrowerUsdtOut) from supplier to msg.sender
 record the filled amounts and emit the match event
 ```
 
-The app mints the shares before Aqua transfers them. The real tokens move only during the match. If any check, collateral transfer or Aqua pull fails, the whole transaction reverts, including the collateral top-up and debt creation. Later fills recompute risk against the updated aggregate debt and current prices.
+The caller of `matchOrders` receives the spread: excess maturity shares when the borrow order offers more shares than the supply order requires, excess USDT when the supply order provides more USDT than the borrow order requires, or both. An order is fully filled when all of the asset it ships is consumed (`faceAmount` for a borrow order, `usdtIn` for a supply order). The app mints the shares before Aqua transfers them. The real tokens move only during the match. If any check, collateral transfer or Aqua pull fails, the whole transaction reverts, including the collateral top-up and debt creation. Later fills recompute risk against the updated aggregate debt and current prices.
 
 ## 5. Vault accounting, repayment and redemption
 

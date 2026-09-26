@@ -42,6 +42,12 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         address supplier; uint40 maturity; uint128 usdtIn; uint128 minTermOut;
         uint128 filledUsdt; bool cancelled;
     }
+    struct MatchSettlement {
+        uint256 borrowerUsdtOut;
+        uint256 supplierTermShares;
+        uint256 matcherTermShares;
+        uint256 matcherUsdt;
+    }
     uint256 public nextBorrowOrderId;
     uint256 public nextSupplyOrderId;
     mapping(uint256 => BorrowOrder) public borrowOrders;
@@ -50,7 +56,16 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
     event BorrowOrderCreated(uint256 indexed orderId, address indexed borrower, uint40 maturity, uint256 faceAmount, uint256 minUsdtOut, uint256 ltvBps, uint256 collateralId);
     event CollateralPulled(address indexed borrower, uint256 indexed collateralId, uint256 amount);
     event SupplyOrderCreated(uint256 indexed orderId, address indexed supplier, uint40 maturity, uint256 usdtIn, uint256 minTermOut);
-    event OrdersMatched(uint256 indexed borrowOrderId, uint256 indexed supplyOrderId, uint256 faceAmount, uint256 termShares, uint256 usdtAmount);
+    event OrdersMatched(
+        uint256 indexed borrowOrderId,
+        uint256 indexed supplyOrderId,
+        address indexed matcher,
+        uint256 faceAmount,
+        uint256 supplierTermShares,
+        uint256 borrowerUsdtOut,
+        uint256 matcherTermShares,
+        uint256 matcherUsdt
+    );
     event BadDebtMarked(address indexed borrower, uint40 indexed maturity, uint256 amount);
     event Liquidated(
         address indexed liquidator,
@@ -157,18 +172,43 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         require(faceAmount != 0 && usdtAmount != 0, "ZERO_FILL");
         require(faceAmount <= uint256(b.faceAmount) - b.filledFace, "BORROW_OVERFILL");
         require(usdtAmount <= uint256(s.usdtIn) - s.filledUsdt, "SUPPLY_OVERFILL");
-        require(usdtAmount >= uint256(b.minUsdtOut) * faceAmount / b.faceAmount, "BORROW_PRICE");
+        MatchSettlement memory settlement;
+        settlement.borrowerUsdtOut = Math.ceilDiv(uint256(b.minUsdtOut) * faceAmount, b.faceAmount);
+        require(usdtAmount >= settlement.borrowerUsdtOut, "BORROW_PRICE");
         uint256 newDebt = totalDebt[b.borrower] + faceAmount;
         _topUpCollateral(b.borrower, b.collateralId, b.ltvBps, newDebt);
         AquaTermVault vault = vaultForMaturity[b.maturity];
         totalDebt[b.borrower] = newDebt;
         debtByVault[b.borrower][address(vault)] += faceAmount;
         uint256 termShares = vault.mintDebtShares(b.borrower, faceAmount);
-        require(termShares >= uint256(s.minTermOut) * usdtAmount / s.usdtIn, "SUPPLY_PRICE");
-        AQUA.pull(b.borrower, borrowStrategyHash(borrowOrderId), address(vault), termShares, s.supplier);
-        AQUA.pull(s.supplier, supplyStrategyHash(supplyOrderId), address(usdt), usdtAmount, b.borrower);
+        settlement.supplierTermShares = Math.ceilDiv(uint256(s.minTermOut) * usdtAmount, s.usdtIn);
+        require(termShares >= settlement.supplierTermShares, "SUPPLY_PRICE");
+        settlement.matcherTermShares = termShares - settlement.supplierTermShares;
+        settlement.matcherUsdt = usdtAmount - settlement.borrowerUsdtOut;
+        _settleAqua(b, s, borrowOrderId, supplyOrderId, address(vault), settlement);
         b.filledFace += uint128(faceAmount); s.filledUsdt += uint128(usdtAmount);
-        emit OrdersMatched(borrowOrderId, supplyOrderId, faceAmount, termShares, usdtAmount);
+        emit OrdersMatched(
+            borrowOrderId, supplyOrderId, msg.sender, faceAmount, settlement.supplierTermShares, settlement.borrowerUsdtOut,
+            settlement.matcherTermShares, settlement.matcherUsdt
+        );
+    }
+
+    function _settleAqua(
+        BorrowOrder storage b,
+        SupplyOrder storage s,
+        uint256 borrowOrderId,
+        uint256 supplyOrderId,
+        address vault,
+        MatchSettlement memory settlement
+    ) internal {
+        AQUA.pull(b.borrower, borrowStrategyHash(borrowOrderId), vault, settlement.supplierTermShares, s.supplier);
+        if (settlement.matcherTermShares != 0) {
+            AQUA.pull(b.borrower, borrowStrategyHash(borrowOrderId), vault, settlement.matcherTermShares, msg.sender);
+        }
+        AQUA.pull(s.supplier, supplyStrategyHash(supplyOrderId), address(usdt), settlement.borrowerUsdtOut, b.borrower);
+        if (settlement.matcherUsdt != 0) {
+            AQUA.pull(s.supplier, supplyStrategyHash(supplyOrderId), address(usdt), settlement.matcherUsdt, msg.sender);
+        }
     }
 
     /// @dev Use existing deposited collateral first; pull only the shortfall from the chosen wallet token.
