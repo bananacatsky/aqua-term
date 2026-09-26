@@ -1,7 +1,6 @@
 /*
- * Frontend Web3 configuration.
- * Replace the zero addresses with addresses from the deployment network.
- * These values are public and are safe to keep in frontend code.
+ * Frontend Web3 configuration (ABIs, maturities, chain defaults).
+ * Deployment-specific values come from env-config.js (see scripts/gen_frontend_config.py).
  */
 const ZERO_ADDRESS='0x0000000000000000000000000000000000000000';
 
@@ -9,6 +8,10 @@ const AquaChains={
   ethereum:{
     key:'ethereum', chainId:1, name:'Ethereum', currency:'ETH',
     rpcUrl:'https://ethereum-rpc.publicnode.com', explorer:'https://etherscan.io',
+  },
+  sepolia:{
+    key:'sepolia', chainId:11155111, name:'Sepolia', currency:'ETH',
+    rpcUrl:'https://ethereum-sepolia-rpc.publicnode.com', explorer:'https://sepolia.etherscan.io',
   },
   base:{
     key:'base', chainId:8453, name:'Base', currency:'ETH',
@@ -24,11 +27,16 @@ const AquaChains={
   },
 };
 
-// Set this to the chain where AquaTermApp is deployed.
-const AQUA_CHAIN='ethereum';
+// Overridden by window.AquaEnv.chain when env-config.js is present.
+let AQUA_CHAIN='ethereum';
 
 const AquaContracts={
   ethereum:{
+    app:ZERO_ADDRESS,
+    debtToken:ZERO_ADDRESS,
+    tokens:{usdt:ZERO_ADDRESS,weth:ZERO_ADDRESS,wbtc:ZERO_ADDRESS},
+  },
+  sepolia:{
     app:ZERO_ADDRESS,
     debtToken:ZERO_ADDRESS,
     tokens:{usdt:ZERO_ADDRESS,weth:ZERO_ADDRESS,wbtc:ZERO_ADDRESS},
@@ -100,4 +108,24 @@ const AquaABIs={
   ],
 };
 
-window.AquaConfig={ZERO_ADDRESS,AquaChains,AQUA_CHAIN,AquaContracts,AquaTokens,AquaMaturities,AquaABIs};
+(function applyAquaEnv(){
+  const env=window.AquaEnv;
+  if(!env) return;
+  if(env.chain) AQUA_CHAIN=env.chain;
+  if(env.chains){
+    Object.entries(env.chains).forEach(([key,cfg])=>{
+      AquaChains[key]={...AquaChains[key],key,...cfg};
+    });
+  }
+  if(env.contracts){
+    Object.entries(env.contracts).forEach(([key,cfg])=>{
+      AquaContracts[key]={
+        ...AquaContracts[key],
+        ...cfg,
+        tokens:{...AquaContracts[key]?.tokens,...cfg.tokens},
+      };
+    });
+  }
+})();
+
+window.AquaConfig={ZERO_ADDRESS,AquaChains,get AQUA_CHAIN(){return AQUA_CHAIN},AquaContracts,AquaTokens,AquaMaturities,AquaABIs};

@@ -1,6 +1,8 @@
+const _aquaEnv=window.AquaEnv||{};
 const AquaApi={
-  baseUrl:window.AQUA_API_BASE||'http://127.0.0.1:5002/api',
-  appAddress:'0x0000000000000000000000000000000000000abc',
+  baseUrl:_aquaEnv.apiBase||window.AQUA_API_BASE||'http://127.0.0.1:5001/api',
+  appAddress:(_aquaEnv.appAddress||'0x0000000000000000000000000000000000000abc').toLowerCase(),
+  chain:_aquaEnv.chain||'ethereum',
   requestId:0,
   market:null,
   portfolio:null,
@@ -18,7 +20,7 @@ const AquaApi={
   async loadForAddress(address){
     if(!address) throw new Error('Wallet address is required');
     const requestId=++this.requestId;
-    const params={app:this.appAddress,chain:'ethereum',address};
+    const params={app:this.appAddress,chain:this.chain,address};
     const market=await this.request('market',params);
     const [portfolio,orders,...orderbooks]=await Promise.all([
       this.request('portfolio',params),
@@ -42,7 +44,7 @@ const AquaApi={
 
   async loadPublicData(){
     const requestId=++this.requestId;
-    const params={app:this.appAddress,chain:'ethereum'};
+    const params={app:this.appAddress,chain:this.chain};
     const market=await this.request('market',params);
     const orderbooks=await Promise.all(market.maturities.map(item=>this.request('orderbook',{...params,maturity:item.timestamp})));
     if(requestId!==this.requestId) return null;

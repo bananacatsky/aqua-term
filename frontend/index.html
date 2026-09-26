@@ -55,9 +55,9 @@
 <div class="field"><button id="create-order-btn" class="btn btn-primary" style="width:100%;padding:14px">Create borrow order</button></div><div class="footer-note">The order can be matched only until its deadline. You can cancel any unfilled remainder from Portfolio.</div></div>
 <aside class="card summary"><div class="eyebrow">Preview</div><div id="borrow-preview"><h3>Borrow order</h3><div class="summary-total"><div class="muted">Receive at least now</div><div class="big" id="borrow-preview-now"></div></div><div class="summary-total"><div class="muted">Repay at maturity</div><div class="big" id="borrow-preview-maturity"></div></div><div class="summary-row"><span class="muted">Maturity</span><strong id="borrow-preview-date"></strong></div><div class="summary-row"><span class="muted">Order expires</span><strong id="borrow-preview-deadline"></strong></div><div class="summary-row"><span class="muted">Difference</span><strong id="borrow-preview-diff"></strong></div><div class="summary-row"><span class="muted">Rate</span><strong id="borrow-preview-rate"></strong></div><div class="footer-note">Collateral and risk limits are checked when the order is matched.</div></div><div id="lend-preview" style="display:none"><h3>Lending order</h3><div class="summary-total"><div class="muted">Lend now</div><div class="big" id="lend-preview-now"></div></div><div class="summary-total"><div class="muted">Receive at least at maturity</div><div class="big" id="lend-preview-maturity"></div></div><div class="summary-row"><span class="muted">Maturity</span><strong id="lend-preview-date"></strong></div><div class="summary-row"><span class="muted">Order expires</span><strong id="lend-preview-deadline"></strong></div><div class="summary-row"><span class="muted">Minimum gain</span><strong id="lend-preview-diff"></strong></div><div class="summary-row"><span class="muted">Rate</span><strong id="lend-preview-rate"></strong></div><div class="footer-note">Your order will wait until a compatible borrower is matched or the deadline passes.</div></div></aside></section></section></div>
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
-<script src="web3-config.js"></script>
-<script src="web3.js"></script>
-<script src="api.js"></script>
+<script src="/web3-config.js"></script>
+<script src="/web3.js"></script>
+<script src="/api.js"></script>
 <script>
 let walletProvider;
 let walletSigner;
