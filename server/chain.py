@@ -216,13 +216,14 @@ class ChainReader:
         lending: list[dict[str, Any]] = []
         for maturity in market["maturities"]:
             vault_address = maturity["vault"]
-            vault = _vault_contract(w3, vault_address)
+            vault_checksum = Web3.to_checksum_address(vault_address)
+            vault = _vault_contract(w3, vault_checksum)
             debt_amount = int(
-                contract.functions.debtByVault(user, vault_address).call()
+                contract.functions.debtByVault(user, vault_checksum).call()
             )
             if debt_amount > 0:
                 written_down = int(
-                    contract.functions.writtenDownByVault(user, vault_address).call()
+                    contract.functions.writtenDownByVault(user, vault_checksum).call()
                 )
                 debts.append(
                     {

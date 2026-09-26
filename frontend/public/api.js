@@ -9,12 +9,34 @@ const AquaApi={
   currentAddress:null,
 
   async request(path,params={}){
-    const url=new URL(`${this.baseUrl}/${path.replace(/^\//,'')}`);
+    const base=this.baseUrl.replace(/\/+$/,'');
+    const url=new URL(`${base}/${path.replace(/^\//,'')}`,window.location.origin);
     Object.entries(params).forEach(([key,value])=>{if(value!==undefined&&value!==null)url.searchParams.set(key,value)});
-    const response=await fetch(url);
-    const payload=await response.json();
+    let response;
+    try{
+      response=await fetch(url);
+    }catch(error){
+      throw new Error(`API unreachable (${url.origin}${url.pathname})`);
+    }
+    let payload;
+    try{
+      payload=await response.json();
+    }catch{
+      throw new Error(`API returned non-JSON (${response.status})`);
+    }
     if(!response.ok) throw new Error(payload.error||`API request failed (${response.status})`);
     return payload;
+  },
+
+  async loadOrderbooks(params,maturities){
+    return Promise.all((maturities||[]).map(async item=>{
+      try{
+        return await this.request('orderbook',{...params,maturity:item.timestamp});
+      }catch(error){
+        console.warn('Orderbook unavailable',item.timestamp,error);
+        return {maturity:item.timestamp,buy:{items:[]},sell:{items:[]}};
+      }
+    }));
   },
 
   async loadForAddress(address){
@@ -22,10 +44,10 @@ const AquaApi={
     const requestId=++this.requestId;
     const params={app:this.appAddress,chain:this.chain,address};
     const market=await this.request('market',params);
-    const [portfolio,orders,...orderbooks]=await Promise.all([
+    const [portfolio,orders,orderbooks]=await Promise.all([
       this.request('portfolio',params),
       this.request('orders',{app:params.app,chain:params.chain,maker:address}),
-      ...market.maturities.map(item=>this.request('orderbook',{app:params.app,chain:params.chain,maturity:item.timestamp})),
+      this.loadOrderbooks(params,market.maturities),
     ]);
     if(requestId!==this.requestId) return null;
     this.market=market;
@@ -35,7 +57,7 @@ const AquaApi={
     const createOrder=document.getElementById('create-order');
     if(createOrder) createOrder.classList.remove('wallet-disconnected');
     this.renderPortfolio(portfolio);
-    orderbooks.forEach((item,index)=>this.renderOrderbook(item,index,true));
+    orderbooks.forEach(item=>this.renderOrderbook(item,true));
     this.renderOpenOrders(orders);
     const status=document.getElementById('api-status');
     if(status){status.textContent='API: connected';status.className='api-status online'}
@@ -46,13 +68,63 @@ const AquaApi={
     const requestId=++this.requestId;
     const params={app:this.appAddress,chain:this.chain};
     const market=await this.request('market',params);
-    const orderbooks=await Promise.all(market.maturities.map(item=>this.request('orderbook',{...params,maturity:item.timestamp})));
+    const orderbooks=await this.loadOrderbooks(params,market.maturities);
     if(requestId!==this.requestId) return null;
+    this.market=market;
     this.renderMarket(market);
-    orderbooks.forEach((item,index)=>this.renderOrderbook(item,index));
+    orderbooks.forEach(item=>this.renderOrderbook(item));
     const status=document.getElementById('api-status');
     if(status){status.textContent='API: public data';status.className='api-status online'}
     return {market,orderbooks};
+  },
+
+  configuredDebtToken(){
+    const chain=window.AquaEnv?.chain||window.AquaConfig?.AQUA_CHAIN;
+    const contracts=window.AquaConfig?.AquaContracts?.[chain]||{};
+    const debtAddr=String(contracts.debtToken||'').toLowerCase();
+    const tokens=contracts.tokens||{};
+    const key=Object.keys(tokens).find(item=>String(tokens[item]||'').toLowerCase()===debtAddr);
+    const meta=key&&window.AquaConfig?.AquaTokens?.[key];
+    if(meta) return {symbol:meta.symbol,decimals:meta.decimals,address:tokens[key]};
+    const usdt=window.AquaConfig?.AquaTokens?.usdt;
+    return usdt?{symbol:usdt.symbol,decimals:usdt.decimals}:{symbol:'USDT',decimals:6};
+  },
+
+  debtToken(){
+    return this.market?.debt_token||this.configuredDebtToken();
+  },
+
+  debtSymbol(){
+    return this.debtToken().symbol||this.configuredDebtToken().symbol||'USDT';
+  },
+
+  isEthLikeCollateral(symbol){
+    return /ETH/i.test(String(symbol||''));
+  },
+
+  debtDecimals(){
+    return Number(this.debtToken().decimals??6);
+  },
+
+  maturityLabel(timestamp){
+    return this.market?.maturities?.find(item=>Number(item.timestamp)===Number(timestamp))?.label||timestamp;
+  },
+
+  formatDebt(amount,opts={}){
+    const value=Number(amount||0)/10**this.debtDecimals();
+    const digits=opts.digits??2;
+    return `${value.toLocaleString('en-US',{maximumFractionDigits:digits})} ${this.debtSymbol()}`;
+  },
+
+  formatUsdFromDebt(amount){
+    const value=Number(amount||0)/10**this.debtDecimals();
+    return `$${value.toLocaleString('en-US',{maximumFractionDigits:2})}`;
+  },
+
+  formatTokenAmount(amount,decimals,symbol){
+    const value=Number(amount||0)/10**Number(decimals||0);
+    const digits=Number(decimals)>=8?3:Number(decimals)>=6?2:4;
+    return `${value.toLocaleString('en-US',{maximumFractionDigits:digits})} ${symbol}`;
   },
 
   clearDashboard(){
@@ -72,11 +144,13 @@ const AquaApi={
     });
     const maturitySelect=document.getElementById('maturity-select');
     if(maturitySelect) maturitySelect.replaceChildren();
-    const collateralSelect=document.querySelector('#borrow-fields select');
+    const collateralSelect=document.getElementById('order-collateral-select')||document.querySelector('#borrow-fields select');
     if(collateralSelect) collateralSelect.replaceChildren();
-    const depositSelect=document.getElementById('deposit-token-select');
-    if(depositSelect) depositSelect.replaceChildren();
-    ['deposit-token-balance','deposited-token-balance'].forEach(id=>{
+    ['deposit-token-select','withdraw-token-select'].forEach(id=>{
+      const select=document.getElementById(id);
+      if(select) select.replaceChildren();
+    });
+    ['deposit-token-balance','withdraw-token-balance'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.textContent='';
     });
     document.querySelectorAll('.maturity-tab').forEach(tab=>{tab.textContent='';tab.hidden=false;});
@@ -90,17 +164,45 @@ const AquaApi={
   renderMarket(data){
     const maturitySelect=document.getElementById('maturity-select');
     if(maturitySelect) maturitySelect.innerHTML=data.maturities.map(item=>`<option value="${item.timestamp}">${item.label}</option>`).join('');
-    const collateralSelect=document.querySelector('#borrow-fields select');
-    if(collateralSelect) collateralSelect.innerHTML=data.collaterals.map(item=>`<option value="${item.id}">${item.symbol}</option>`).join('');
-    const depositSelect=document.getElementById('deposit-token-select');
-    if(depositSelect){
-      depositSelect.innerHTML=data.collaterals.map(item=>`<option value="${item.id}">${item.symbol}</option>`).join('');
-      this.updateDepositBalance();
+    const collateralSelect=document.getElementById('order-collateral-select')||document.querySelector('#borrow-fields select');
+    if(collateralSelect){
+      const previous=collateralSelect.value;
+      collateralSelect.innerHTML=(data.collaterals||[]).map(item=>`<option value="${item.id}">${item.symbol}</option>`).join('');
+      const keep=previous&&(data.collaterals||[]).some(item=>String(item.id)===String(previous));
+      const ethLike=(data.collaterals||[]).find(item=>this.isEthLikeCollateral(item.symbol));
+      if(keep) collateralSelect.value=previous;
+      else if(ethLike) collateralSelect.value=String(ethLike.id);
     }
-    document.querySelectorAll('.maturity-tab').forEach((tab,index)=>{
-      const maturity=data.maturities[index];
-      if(maturity) { tab.textContent=maturity.label; tab.hidden=false; }
-      else tab.hidden=true;
+    this.fillCollateralSelects(data.collaterals);
+    const debt=data.debt_token?.symbol||this.debtSymbol();
+    const walletHint=document.getElementById('wallet-balance-hint');
+    if(walletHint) walletHint.textContent=[debt,...data.collaterals.map(item=>item.symbol)].filter(Boolean).join(' + ');
+    const lendNote=document.getElementById('lend-wallet-note');
+    if(lendNote) lendNote.textContent=`Your ${debt} stays in your wallet until a compatible borrower is matched.`;
+    document.querySelectorAll('[data-debt-symbol]').forEach(el=>{el.textContent=debt});
+    this.renderMaturityTabs(data.maturities);
+  },
+
+  renderMaturityTabs(maturities){
+    const tabs=document.querySelector('.maturity-tabs');
+    const ladder=document.querySelector('.card.ladder');
+    if(!tabs||!ladder) return;
+    const selected=document.querySelector('.maturity-tab.active')?.dataset.month;
+    const keep=maturities.some(item=>String(item.timestamp)===selected)?selected:String(maturities[0]?.timestamp||'');
+    tabs.replaceChildren();
+    ladder.querySelectorAll('.month-panel').forEach(panel=>panel.remove());
+    maturities.forEach(item=>{
+      const key=String(item.timestamp);
+      const tab=document.createElement('button');
+      tab.type='button';
+      tab.className=`maturity-tab${key===keep?' active':''}`;
+      tab.dataset.month=key;
+      tab.textContent=item.label;
+      tabs.appendChild(tab);
+      const panel=document.createElement('div');
+      panel.className=`month-panel${key===keep?' active':''}`;
+      panel.dataset.panel=key;
+      ladder.appendChild(panel);
     });
   },
 
@@ -113,13 +215,10 @@ const AquaApi={
     const message=document.getElementById('portfolio-connect-message');
     if(message) message.style.display='none';
     const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value};
-    const usdt=v=>`${(Number(v)/1e6).toLocaleString('en-US',{maximumFractionDigits:2})} USDT`;
-    const usd=v=>`$${(Number(v)/1e6).toLocaleString('en-US',{maximumFractionDigits:2})}`;
     const usdCents=v=>`$${(Number(v)/100).toLocaleString('en-US',{maximumFractionDigits:2})}`;
-    const wallet=data.wallet.reduce((map,item)=>(map[item.token.symbol.toLowerCase()]=item.amount,map),{});
     set('wallet-balance-value',data.wallet_value_usd_cents==null?'':usdCents(data.wallet_value_usd_cents));
-    set('debt-value',usdt(data.risk.total_debt));
-    set('collateral-value',usd(data.risk.collateral_value));
+    set('debt-value',this.formatDebt(data.risk.total_debt));
+    set('collateral-value',this.formatUsdFromDebt(data.risk.collateral_value));
     set('health-factor-value',data.risk.health_factor||'');
     set('current-ltv-value',`${(data.risk.current_ltv_bps/100).toFixed(1)}%`);
     set('borrow-limit-value',`${(data.risk.max_borrow_ltv_bps/100).toFixed(0)}%`);
@@ -130,59 +229,86 @@ const AquaApi={
     set('health-description',data.risk.health_message||'');
     const riskbar=document.getElementById('riskbar-value');
     if(riskbar) riskbar.style.width=`${Math.max(0,Math.min(100,Number(data.risk.risk_percent||0)))}%`;
-    set('wallet-usdt-amount',usdt(wallet.usdt||0));
-    set('wallet-weth-amount',`${(Number(wallet.weth||0)/1e18).toFixed(2)} WETH`);
-    set('wallet-wbtc-amount',`${(Number(wallet.wbtc||0)/1e8).toFixed(3)} WBTC`);
-    const collateral=data.collateral.reduce((map,item)=>(map[item.token.symbol.toLowerCase()]=item.amount,map),{});
-    set('collateral-weth-amount',`${(Number(collateral.weth||0)/1e18).toFixed(2)} WETH`);
-    set('collateral-wbtc-amount',`${(Number(collateral.wbtc||0)/1e8).toFixed(3)} WBTC`);
     this.updateDepositBalance();
 
     const debts=document.getElementById('debts-list');
-    if(debts) debts.innerHTML=data.debts.map(item=>`<div class="position-row"><div><div class="num">Debt · ${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${usdt(item.face_debt)}</div><div class="muted">Outstanding</div></div><div><div class="num">${usdt(item.written_down)}</div><div class="muted">Written down</div></div><button class="btn btn-primary">Repay</button></div>`).join('');
+    if(debts) debts.innerHTML=data.debts.length?data.debts.map(item=>`<div class="position-row"><div><div class="num">Debt · ${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${this.formatDebt(item.face_debt)}</div><div class="muted">Outstanding</div></div><div><div class="num">${this.formatDebt(item.written_down)}</div><div class="muted">Written down</div></div><button class="btn btn-primary">Repay</button></div>`).join(''):'<div class="muted">No active debts.</div>';
     const lending=document.getElementById('lending-list');
-    if(lending) lending.innerHTML=data.lending.map(item=>`<div class="position-row"><div><div class="num">${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${usdt(item.assets)}</div><div class="muted">Lent now</div></div><div><div class="num">${usdt(item.redeemable_assets)}</div><div class="muted">Redeemable now</div></div><button class="btn btn-primary">Redeem</button></div>`).join('');
+    if(lending) lending.innerHTML=data.lending.length?data.lending.map(item=>`<div class="position-row"><div><div class="num">${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${this.formatDebt(item.assets)}</div><div class="muted">Lent now</div></div><div><div class="num">${this.formatDebt(item.redeemable_assets)}</div><div class="muted">Redeemable now</div></div><button class="btn btn-primary">Redeem</button></div>`).join(''):'<div class="muted">No lending positions.</div>';
     const collateralList=document.getElementById('collateral-list');
-    if(collateralList) collateralList.innerHTML=data.collateral.map(item=>`<div class="token-row"><div class="token"><div class="coin">${item.token.symbol}</div><div><div class="num">${item.token.symbol==='WETH'?(Number(item.amount)/1e18).toFixed(3):(Number(item.amount)/1e8).toFixed(3)} ${item.token.symbol}</div><div class="muted">Deposited</div></div></div><div><div class="num">${(Number(data.risk.collateral_value)/1e6).toLocaleString('en-US')} USDT</div><div class="muted">Portfolio value</div></div></div>`).join('');
+    if(collateralList) collateralList.innerHTML=data.collateral.length?data.collateral.map(item=>`<div class="token-row"><div class="token"><div class="coin">${item.token.symbol}</div><div><div class="num">${this.formatTokenAmount(item.amount,item.token.decimals,item.token.symbol)}</div><div class="muted">Deposited</div></div></div><div><div class="num">${this.formatUsdFromDebt(data.risk.collateral_value)}</div><div class="muted">Portfolio value</div></div></div>`).join(''):'<div class="muted">No collateral deposited.</div>';
     const walletList=document.getElementById('wallet-list');
-    if(walletList) walletList.innerHTML=data.wallet.map(item=>`<div class="token-row"><div class="token"><div class="coin">${item.token.symbol}</div><div><div class="num">${item.token.symbol==='USDT'?(Number(item.amount)/1e6).toFixed(2):(item.token.symbol==='WETH'?(Number(item.amount)/1e18).toFixed(3):(Number(item.amount)/1e8).toFixed(3))} ${item.token.symbol}</div><div class="muted">Wallet</div></div></div><div class="num">—</div></div>`).join('');
+    if(walletList) walletList.innerHTML=data.wallet.length?data.wallet.map(item=>`<div class="token-row"><div class="token"><div class="coin">${item.token.symbol}</div><div><div class="num">${this.formatTokenAmount(item.amount,item.token.decimals,item.token.symbol)}</div><div class="muted">Wallet</div></div></div><div class="num">—</div></div>`).join(''):'<div class="muted">No wallet balances.</div>';
   },
 
-  selectedCollateral(){
-    const select=document.getElementById('deposit-token-select');
+  fillCollateralSelects(collaterals){
+    const items=collaterals||[];
+    ['deposit-token-select','withdraw-token-select'].forEach(id=>{
+      const select=document.getElementById(id);
+      if(!select) return;
+      const previous=select.value;
+      select.innerHTML=items.map(item=>`<option value="${item.id}">${item.symbol}</option>`).join('');
+      const keep=previous&&items.some(item=>String(item.id)===String(previous));
+      const ethLike=items.find(item=>this.isEthLikeCollateral(item.symbol));
+      if(keep) select.value=previous;
+      else if(ethLike) select.value=String(ethLike.id);
+    });
+    this.updateDepositBalance();
+  },
+
+  preferDepositedCollateral(selectId='withdraw-token-select'){
+    const select=document.getElementById(selectId);
+    const deposited=this.portfolio?.collateral?.[0];
+    const match=this.market?.collaterals?.find(item=>item.address===deposited?.token.address||item.symbol===deposited?.token.symbol);
+    if(select && match) select.value=String(match.id);
+    this.updateDepositBalance();
+  },
+
+  selectedCollateral(selectId='deposit-token-select'){
+    const select=document.getElementById(selectId);
     const id=Number(select?.value);
     return this.market?.collaterals?.find(item=>item.id===id)||null;
   },
 
   updateDepositBalance(){
-    const token=this.selectedCollateral();
+    const walletToken=this.selectedCollateral('deposit-token-select');
+    const depositedToken=this.selectedCollateral('withdraw-token-select');
     const walletBalanceEl=document.getElementById('deposit-token-balance');
-    const depositedBalanceEl=document.getElementById('deposited-token-balance');
-    const walletItem=this.portfolio?.wallet?.find(entry=>entry.token.symbol===token?.symbol);
-    const depositedItem=this.portfolio?.collateral?.find(entry=>entry.token.symbol===token?.symbol);
-    if(walletBalanceEl) walletBalanceEl.textContent=token&&walletItem?`${ethers.formatUnits(walletItem.amount,token.decimals)} ${token.symbol}`:'';
-    if(depositedBalanceEl) depositedBalanceEl.textContent=token&&depositedItem?`${ethers.formatUnits(depositedItem.amount,token.decimals)} ${token.symbol}`:'';
+    const depositedBalanceEl=document.getElementById('withdraw-token-balance');
+    const walletItem=this.portfolio?.wallet?.find(entry=>entry.token.address===walletToken?.address||entry.token.symbol===walletToken?.symbol);
+    const depositedItem=this.portfolio?.collateral?.find(entry=>entry.token.address===depositedToken?.address||entry.token.symbol===depositedToken?.symbol);
+    if(walletBalanceEl) walletBalanceEl.textContent=walletToken?(walletItem?`${ethers.formatUnits(walletItem.amount,walletToken.decimals)} ${walletToken.symbol}`:`0 ${walletToken.symbol}`):'';
+    if(depositedBalanceEl) depositedBalanceEl.textContent=depositedToken?(depositedItem?`${ethers.formatUnits(depositedItem.amount,depositedToken.decimals)} ${depositedToken.symbol}`:`0 ${depositedToken.symbol}`):'';
   },
 
   renderOpenOrders(data){
     const openOrders=document.getElementById('open-orders-list');
     if(!openOrders) return;
-    const rows=[...(data.borrow?.items||[]).map(item=>`<div class="order-row"><div><div class="num">Borrow · ${item.maturity}</div><div class="muted">Open order</div></div><div class="num">${(Number(item.remaining_face||item.face_amount)/1e6).toLocaleString('en-US')} USDT</div><span class="pill orange">Open</span></div>`),...(data.supply?.items||[]).map(item=>`<div class="order-row"><div><div class="num">Lend · ${item.maturity}</div><div class="muted">Open order</div></div><div class="num">${(Number(item.remaining_debt_token||item.debt_token_in)/1e6).toLocaleString('en-US')} USDT</div><span class="pill orange">Open</span></div>` )];
-    openOrders.innerHTML=rows.join('');
+    const rows=[
+      ...(data.borrow?.items||[]).map(item=>`<div class="order-row"><div><div class="num">Borrow · ${this.maturityLabel(item.maturity)}</div><div class="muted">Open order</div></div><div class="num">${this.formatDebt(item.remaining_face||item.face_amount)}</div><span class="pill orange">Open</span></div>`),
+      ...(data.supply?.items||[]).map(item=>`<div class="order-row"><div><div class="num">Lend · ${this.maturityLabel(item.maturity)}</div><div class="muted">Open order</div></div><div class="num">${this.formatDebt(item.remaining_debt_token||item.debt_token_in)}</div><span class="pill orange">Open</span></div>`),
+    ];
+    openOrders.innerHTML=rows.length?rows.join(''):'<div class="muted">No open orders.</div>';
   },
 
-  renderOrderbook(data,index=0,showMatch=false){
-    const panel=document.querySelectorAll('[data-panel]')[index];
-    if(!panel)return;
-    const amount=v=>`${(Number(v)/1e6).toLocaleString('en-US',{maximumFractionDigits:0})} USDT`;
+  renderOrderbook(data,showMatch=false){
+    const target=document.querySelector(`[data-panel="${data.maturity}"]`);
+    if(!target) return;
+    const buy=data.buy?.items||[];
+    const sell=data.sell?.items||[];
+    if(!buy.length&&!sell.length){
+      target.innerHTML='<div class="empty-month">No open orders for this maturity.</div>';
+      return;
+    }
+    const amount=v=>this.formatDebt(v,{digits:0});
     const row=(item,type)=>{
-      const now=type==='lender'?item.debt_token_in:item.min_debt_token_out;
-      const later=type==='lender'?item.min_term_out:item.face_amount;
-      const rate=((Number(later)/Number(now)-1)*100).toFixed(1);
+      const now=type==='lender'?(item.remaining_debt_token||item.debt_token_in):(item.min_debt_token_out);
+      const later=type==='lender'?(item.min_term_out):(item.remaining_face||item.face_amount);
+      const rate=Number(now)>0?((Number(later)/Number(now)-1)*100).toFixed(1):'—';
       return `<div class="ladder-row ${type==='lender'?'lender':'borrower'}"><div><span class="side-badge"><span class="side-dot"></span>${type==='lender'?'Lend':'Borrow'}</span><span class="muted">${type==='lender'?'Lend now':'Get now'}</span><br><b>${amount(now)}</b></div><div class="flow-arrow">${type==='lender'?'→':'←'}</div><div><span class="muted">${type==='lender'?'Receive later':'Repay later'}</span><br><b>${amount(later)}</b></div><div class="rate">${rate}%</div></div>`;
     };
     const match=showMatch?'<div class="match-zone"><div class="match-title">Match available</div><div class="reward">Available to execute</div><button class="btn btn-primary" style="margin-top:9px;width:100%">Match!</button></div>':'';
-    panel.innerHTML=data.buy.items.map(item=>row(item,'lender')).join('')+match+data.sell.items.map(item=>row(item,'borrower')).join('');
+    target.innerHTML=buy.map(item=>row(item,'lender')).join('')+match+sell.map(item=>row(item,'borrower')).join('');
   },
 };
 window.AquaApi=AquaApi;

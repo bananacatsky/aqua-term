@@ -64,12 +64,12 @@ def _orderbook_items(maturity: int) -> tuple[list[dict[str, Any]], list[dict[str
     deadline = NOW + 7 * 24 * 60 * 60
     # “sell” is the borrow side; “buy” is the supply side, like server/db.py.
     sells = [
-        {"app_address": MOCK_APP, "chain": "ethereum", "order_id": 12, "borrower": "0x2222222222222222222222222222222222222222", "maturity": maturity, "deadline": deadline, "face_amount": "500000000", "min_debt_token_out": "480000000", "ltv_bps": 6000, "collateral_id": 0, "filled_face": "0", "cancelled": 0, "created_block": 21000010, "quote_num": "480000000", "quote_den": "500000000"},
-        {"app_address": MOCK_APP, "chain": "ethereum", "order_id": 13, "borrower": "0x3333333333333333333333333333333333333333", "maturity": maturity, "deadline": deadline, "face_amount": "780000000", "min_debt_token_out": "700000000", "ltv_bps": 6500, "collateral_id": 1, "filled_face": "0", "cancelled": 0, "created_block": 21000011, "quote_num": "700000000", "quote_den": "780000000"},
+        {"order_id": 12, "side": "sell", "maker": "0x2222222222222222222222222222222222222222", "maturity": maturity, "deadline": deadline, "face_amount": "500000000", "filled_face": "0", "remaining_face": "500000000", "min_debt_token_out": "480000000", "ltv_bps": 6000, "collateral_id": 0, "cancelled": False, "quote": {"num": "480000000", "den": "500000000"}, "quote_rate": "0.96"},
+        {"order_id": 13, "side": "sell", "maker": "0x3333333333333333333333333333333333333333", "maturity": maturity, "deadline": deadline, "face_amount": "780000000", "filled_face": "0", "remaining_face": "780000000", "min_debt_token_out": "700000000", "ltv_bps": 6500, "collateral_id": 1, "cancelled": False, "quote": {"num": "700000000", "den": "780000000"}, "quote_rate": "0.8974358974358975"},
     ]
     buys = [
-        {"app_address": MOCK_APP, "chain": "ethereum", "order_id": 7, "supplier": "0x4444444444444444444444444444444444444444", "maturity": maturity, "deadline": deadline, "debt_token_in": "500000000", "min_term_out": "540000000", "filled_debt_token": "0", "cancelled": 0, "created_block": 21000012, "quote_num": "540000000", "quote_den": "500000000"},
-        {"app_address": MOCK_APP, "chain": "ethereum", "order_id": 8, "supplier": "0x5555555555555555555555555555555555555555", "maturity": maturity, "deadline": deadline, "debt_token_in": "700000000", "min_term_out": "774000000", "filled_debt_token": "0", "cancelled": 0, "created_block": 21000013, "quote_num": "774000000", "quote_den": "700000000"},
+        {"order_id": 7, "side": "buy", "maker": "0x4444444444444444444444444444444444444444", "maturity": maturity, "deadline": deadline, "debt_token_in": "500000000", "filled_debt_token": "0", "remaining_debt_token": "500000000", "min_term_out": "540000000", "cancelled": False, "quote": {"num": "540000000", "den": "500000000"}, "quote_rate": "1.08"},
+        {"order_id": 8, "side": "buy", "maker": "0x5555555555555555555555555555555555555555", "maturity": maturity, "deadline": deadline, "debt_token_in": "700000000", "filled_debt_token": "0", "remaining_debt_token": "700000000", "min_term_out": "774000000", "cancelled": False, "quote": {"num": "774000000", "den": "700000000"}, "quote_rate": "1.1057142857142858"},
     ]
     return sells, buys
 

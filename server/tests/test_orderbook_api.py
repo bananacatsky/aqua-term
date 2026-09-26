@@ -133,6 +133,7 @@ def test_orderbook_sorted_and_paginated():
     assert payload["buy"]["total"] == 2
     assert payload["sell"]["items"][0]["order_id"] == 1
     assert payload["buy"]["items"][0]["order_id"] == 10
+    assert payload["sync"]["status"] == "ok"
 
 
 def test_unknown_app_returns_404():

@@ -17,7 +17,7 @@
 .maturity-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 auto 14px;max-width:590px}.maturity-tab{border:1px solid var(--line);background:#fff;color:#666;border-radius:12px;padding:9px 13px;font-weight:850;cursor:pointer}.maturity-tab.active{background:#111;color:#fff;border-color:#111}.ladder{overflow:hidden;max-width:590px;margin:0 auto}.ladder-head,.ladder-row{display:grid;grid-template-columns:148px 24px 164px 54px;column-gap:6px;align-items:center;padding:9px 11px}.ladder-head{background:#fbfbfc;border-bottom:1px solid var(--line);font-size:10px;text-transform:uppercase;letter-spacing:.045em;color:var(--muted);font-weight:800}.ladder-head .rate-head{text-align:right}.ladder-row{border-bottom:1px solid var(--line);min-height:54px}.ladder-row.lender{background:#fff7ee}.ladder-row.borrower{background:#edfafa}.ladder-row .rate{font-size:12px;font-weight:800;letter-spacing:-.01em;text-align:right;color:#777}.ladder-row b{font-size:14px;letter-spacing:-.015em}.ladder-row .muted{font-size:10px;line-height:1}.flow-arrow{text-align:center;font-size:16px;font-weight:900;color:#9a9a9a}.side-badge{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;margin-right:6px}.side-dot{width:6px;height:6px;border-radius:50%}.lender .side-dot{background:#ff9a3d}.borrower .side-dot{background:#19c7b0}.match-zone{width:320px;max-width:calc(100% - 24px);margin:10px auto;padding:12px 14px;background:linear-gradient(180deg,#fff,#f7fbfa);border:1px solid var(--line);border-radius:14px;text-align:center}.match-title{font-size:16px;font-weight:900}.reward{margin-top:3px;font-size:12px;color:var(--muted)}.reward strong{display:inline;color:var(--text);font-size:12px;letter-spacing:0;margin:0 0 0 4px}.month-panel{display:none}.month-panel.active{display:block}.empty-month{padding:34px;text-align:center;color:var(--muted)}
 @media(max-width:800px){.ladder{max-width:100%}.maturity-tabs{max-width:100%}.ladder-head{display:none}.ladder-row{grid-template-columns:minmax(118px,1fr) 22px minmax(132px,1fr) 48px;column-gap:5px;padding:9px 9px}.ladder-row .rate{font-size:11px}.flow-arrow{font-size:15px}}
 </style>
-<style>.api-status{font-size:12px;color:var(--muted);white-space:nowrap}.api-status.online{color:var(--green)}.api-status.offline{color:var(--red)}.connect-message{display:none;min-height:calc(100vh - 140px);align-items:center;justify-content:center;text-align:center}.connect-wallet-large{min-width:260px;padding:18px 32px;font-size:18px;background:var(--orange);color:#fff}.riskbar span{width:0}.form-note[role=alert]{color:var(--red);background:#fff1f1;border:1px solid #ffd4d4;border-radius:10px;padding:10px 12px}#portfolio.wallet-disconnected>.page-head,#portfolio.wallet-disconnected>.grid,#portfolio.wallet-disconnected>.card,#create-order.wallet-disconnected>.page-head,#create-order.wallet-disconnected>.form-shell{display:none!important}#portfolio.wallet-disconnected>.connect-message,#create-order.wallet-disconnected>.connect-message{display:flex!important}</style>
+<style>.api-status{font-size:12px;color:var(--muted);white-space:nowrap}.api-status.online{color:var(--green)}.api-status.offline{color:var(--red)}.connect-message{display:none;min-height:calc(100vh - 140px);align-items:center;justify-content:center;text-align:center}.connect-wallet-large{min-width:260px;padding:18px 32px;font-size:18px;background:var(--orange);color:#fff}.riskbar span{width:0}.form-note[role=alert]{color:var(--red);background:#fff1f1;border:1px solid #ffd4d4;border-radius:10px;padding:10px 12px}#portfolio.wallet-disconnected>.page-head,#portfolio.wallet-disconnected>.grid,#portfolio.wallet-disconnected>.card,#create-order.wallet-disconnected>.page-head,#create-order.wallet-disconnected>.form-shell{display:none!important}#portfolio.wallet-disconnected>.connect-message,#create-order.wallet-disconnected>.connect-message{display:flex!important}.input-with-unit{position:relative}.input-with-unit .input{padding-right:68px}.input-with-unit .input-unit{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:800;color:var(--muted);pointer-events:none}.deadline-toggle{display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;font-weight:800;cursor:pointer;user-select:none}.deadline-toggle input{width:16px;height:16px;accent-color:var(--orange)}#order-deadline-field[hidden]{display:none}.aqua-modal-overlay{position:fixed;inset:0;z-index:90;background:rgba(15,18,20,.42);display:grid;place-items:center;padding:20px}.aqua-modal-overlay[hidden]{display:none}.aqua-modal{width:min(460px,100%);padding:26px;border-radius:18px;background:#fff;box-shadow:0 20px 70px rgba(0,0,0,.22)}.aqua-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.aqua-modal-head h3{margin:0;font-size:20px;letter-spacing:-.03em}.aqua-modal-close{border:0;background:#f1f2f4;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}.aqua-modal .field:first-of-type{margin-top:14px}.aqua-modal .split-actions{margin-top:18px}.aqua-modal .split-actions .btn{flex:1}</style>
 </head>
 <body>
 <div class="app">
@@ -31,12 +31,11 @@
   <div class="wallet"><span id="wallet-network" class="network">Ethereum</span><span id="api-status" class="api-status">API: connecting…</span><button id="connect-wallet" class="wallet-btn" type="button">Connect wallet</button><button id="disconnect-wallet" class="wallet-btn" type="button" style="display:none">Disconnect</button></div>
 </header>
 <section id="portfolio" class="page"><div class="page-head"><div><div class="eyebrow">Portfolio</div><h1>Your portfolio</h1><div class="sub">Your wallet, borrowing risk, debts, lending positions and collateral in one place.</div></div><div class="split-actions"><button id="open-withdraw-collateral" class="btn btn-secondary" type="button">Withdraw collateral</button><button id="open-deposit-collateral" class="btn btn-primary" type="button">Deposit collateral</button></div></div><div id="portfolio-connect-message" class="connect-message"><button id="portfolio-connect-button" class="btn btn-primary connect-wallet-large" type="button">Connect wallet</button></div>
-<section class="grid grid-4"><div class="card metric"><div class="label">Wallet balance</div><div id="wallet-balance-value" class="value"></div><div class="hint">USDT + WETH + WBTC</div></div><div class="card metric"><div class="label">Total debt</div><div id="debt-value" class="value"></div><div class="hint">Across active debts</div></div><div class="card metric"><div class="label">Collateral</div><div id="collateral-value" class="value"></div><div class="hint">Deposited in AquaTerm</div></div><div class="card metric orange-card"><div class="label">Health factor</div><div id="health-factor-value" class="value"></div><div class="hint"><span id="health-status-pill" class="pill"></span></div></div></section>
+<section class="grid grid-4"><div class="card metric"><div class="label">Wallet balance</div><div id="wallet-balance-value" class="value"></div><div id="wallet-balance-hint" class="hint">Debt + collateral</div></div><div class="card metric"><div class="label">Total debt</div><div id="debt-value" class="value"></div><div class="hint">Across active debts</div></div><div class="card metric"><div class="label">Collateral</div><div id="collateral-value" class="value"></div><div class="hint">Deposited in AquaTerm</div></div><div class="card metric orange-card"><div class="label">Health factor</div><div id="health-factor-value" class="value"></div><div class="hint"><span id="health-status-pill" class="pill"></span></div></div></section>
 <section class="card section"><div class="section-head"><h2>Borrowing health</h2><span id="health-status-section" class="pill"></span></div><div class="section-body"><div class="grid grid-4"><div class="metric" style="padding:0"><div class="label">Current LTV</div><div id="current-ltv-value" class="value"></div></div><div class="metric" style="padding:0"><div class="label">Borrow limit</div><div id="borrow-limit-value" class="value"></div></div><div class="metric" style="padding:0"><div class="label">Liquidation limit</div><div id="liquidation-limit-value" class="value"></div></div><div class="metric" style="padding:0"><div class="label">Health factor</div><div id="health-factor-risk-value" class="value"></div></div></div><div class="riskbar"><span id="riskbar-value"></span></div><div id="health-description" class="muted"></div></div></section>
 <section class="card section"><div class="section-head"><h2>My debts</h2><button class="btn btn-secondary" data-route="create-order">Create borrow order</button></div><div id="debts-list" class="section-body"></div></section>
 <section class="card section"><div class="section-head"><h2>My lending positions</h2><button class="btn btn-secondary" data-route="create-order">Create supply order</button></div><div id="lending-list" class="section-body"></div></section>
 <section class="grid grid-2 section"><div class="card"><div class="section-head"><h2>Collateral</h2><span class="muted">Securing your debts</span></div><div id="collateral-list" class="section-body"></div></div><div class="card"><div class="section-head"><h2>Wallet balances</h2><span class="muted">Available in wallet</span></div><div id="wallet-list" class="section-body"></div></div></section>
-<section class="card section"><div class="section-head"><h2>Collateral actions</h2><span class="muted">WETH / WBTC</span></div><div class="section-body"><div class="field-row"><div class="field" style="margin-top:0"><label>Token</label><select id="deposit-token-select" class="select"></select></div><div class="field" style="margin-top:0"><label>Wallet balance</label><div id="deposit-token-balance" class="input"></div></div></div><div class="field-row"><div class="field"><label>Deposited balance</label><div id="deposited-token-balance" class="input"></div></div><div class="field"><label>Amount to deposit or withdraw</label><input id="deposit-amount" class="input" type="text" inputmode="decimal" value=""></div></div><div id="collateral-action-error" class="form-note" role="alert" hidden></div><div class="split-actions"><button id="approve-collateral-button" class="btn btn-secondary" type="button">Approve token</button><button id="deposit-collateral-button" class="btn btn-primary" type="button">Deposit</button><button id="withdraw-collateral-button" class="btn btn-secondary" type="button">Withdraw</button></div></div></section>
 <section class="card section"><div class="section-head"><h2>My open orders</h2></div><div id="open-orders-list" class="section-body"></div></section></section>
 <section id="orders" class="page"><div class="page-head"><div><div class="eyebrow">Order book</div><h1>Maturity markets</h1><div class="sub">Lenders and borrowers meet in one rate ladder for each maturity. Anyone can execute a compatible match and keep the full spread between both limit rates.</div></div></div>
 <div class="maturity-tabs"><button class="maturity-tab active" data-month="oct"></button><button class="maturity-tab" data-month="nov"></button><button class="maturity-tab" data-month="dec"></button><button class="maturity-tab" data-month="jan"></button></div>
@@ -49,11 +48,33 @@
 </div>
 <div class="form-note" style="margin-top:18px">Execution model A: borrower pays up to their maximum rate, lender receives their minimum rate, and the matcher receives the full available spread as the execution reward. The matcher also pays gas.</div></section>
 <section id="create-order" class="page"><div class="page-head"><div><div class="eyebrow">Create order</div><h1>Set your terms</h1><div class="sub">Choose whether you want to borrow or lend, then set the two amounts that matter most.</div></div></div><div id="create-order-connect-message" class="connect-message"><button id="create-order-connect-button" class="btn btn-primary connect-wallet-large" type="button">Connect wallet</button></div><section class="form-shell"><div class="card form-card"><div class="segmented"><button type="button" class="seg active" data-order-type="borrow">Borrow</button><button type="button" class="seg" data-order-type="lend">Lend</button></div>
-<div class="field-row"><div class="field"><label>Maturity</label><select class="select" id="maturity-select"></select></div><div class="field"><label>Order deadline <span class="muted">(must fill by)</span></label><input class="input" id="order-deadline" type="datetime-local" value=""></div></div>
-<div id="borrow-fields"><div class="field"><label>Receive now <span class="muted">(minimum)</span></label><input class="input" id="borrow-receive" value=""></div><div class="field"><label>Repay at maturity</label><input class="input" id="borrow-repay" value=""></div><div class="field-row"><div class="field"><label>Maximum LTV <span class="muted">(limit)</span></label><input class="input" value=""></div><div class="field"><label>Collateral if needed</label><select class="select"></select></div></div><div class="form-note">If more collateral is needed when the order is matched, AquaTerm calculates the required top-up automatically.</div></div>
-<div id="lend-fields" style="display:none"><div class="field"><label>Lend now</label><input class="input" id="lend-now" value=""></div><div class="field"><label>Receive at maturity <span class="muted">(minimum)</span></label><input class="input" id="lend-receive" value=""></div><div class="form-note">Your USDT stays in your wallet until a compatible borrower is matched.</div></div>
+<div class="field"><label>Maturity</label><select class="select" id="maturity-select"></select></div>
+<label class="deadline-toggle"><input id="show-deadline" type="checkbox"> Show deadline</label>
+<div class="field" id="order-deadline-field" hidden><label>Order deadline <span class="muted">(must fill by)</span></label><input class="input" id="order-deadline" type="datetime-local" value=""></div>
+<div id="borrow-fields"><div class="field"><label>Receive now <span class="muted">(minimum)</span></label><div class="input-with-unit"><input class="input" id="borrow-receive" value=""><span class="input-unit" data-debt-symbol></span></div></div><div class="field"><label>Repay later</label><div class="input-with-unit"><input class="input" id="borrow-repay" value=""><span class="input-unit" data-debt-symbol></span></div></div><div class="field-row"><div class="field"><label>Maximum LTV <span class="muted">(limit)</span></label><div class="input-with-unit"><input class="input" id="max-ltv" value="50"><span class="input-unit">%</span></div></div><div class="field"><label>Collateral if needed</label><select class="select" id="order-collateral-select"></select></div></div><div class="form-note">If more collateral is needed when the order is matched, AquaTerm calculates the required top-up automatically.</div></div>
+<div id="lend-fields" style="display:none"><div class="field"><label>Lend now</label><div class="input-with-unit"><input class="input" id="lend-now" value=""><span class="input-unit" data-debt-symbol></span></div></div><div class="field"><label>Receive at maturity <span class="muted">(minimum)</span></label><div class="input-with-unit"><input class="input" id="lend-receive" value=""><span class="input-unit" data-debt-symbol></span></div></div><div id="lend-wallet-note" class="form-note">Your debt token stays in your wallet until a compatible borrower is matched.</div></div>
 <div class="field"><button id="create-order-btn" class="btn btn-primary" style="width:100%;padding:14px">Create borrow order</button></div><div class="footer-note">The order can be matched only until its deadline. You can cancel any unfilled remainder from Portfolio.</div></div>
 <aside class="card summary"><div class="eyebrow">Preview</div><div id="borrow-preview"><h3>Borrow order</h3><div class="summary-total"><div class="muted">Receive at least now</div><div class="big" id="borrow-preview-now"></div></div><div class="summary-total"><div class="muted">Repay at maturity</div><div class="big" id="borrow-preview-maturity"></div></div><div class="summary-row"><span class="muted">Maturity</span><strong id="borrow-preview-date"></strong></div><div class="summary-row"><span class="muted">Order expires</span><strong id="borrow-preview-deadline"></strong></div><div class="summary-row"><span class="muted">Difference</span><strong id="borrow-preview-diff"></strong></div><div class="summary-row"><span class="muted">Rate</span><strong id="borrow-preview-rate"></strong></div><div class="footer-note">Collateral and risk limits are checked when the order is matched.</div></div><div id="lend-preview" style="display:none"><h3>Lending order</h3><div class="summary-total"><div class="muted">Lend now</div><div class="big" id="lend-preview-now"></div></div><div class="summary-total"><div class="muted">Receive at least at maturity</div><div class="big" id="lend-preview-maturity"></div></div><div class="summary-row"><span class="muted">Maturity</span><strong id="lend-preview-date"></strong></div><div class="summary-row"><span class="muted">Order expires</span><strong id="lend-preview-deadline"></strong></div><div class="summary-row"><span class="muted">Minimum gain</span><strong id="lend-preview-diff"></strong></div><div class="summary-row"><span class="muted">Rate</span><strong id="lend-preview-rate"></strong></div><div class="footer-note">Your order will wait until a compatible borrower is matched or the deadline passes.</div></div></aside></section></section></div>
+<div id="deposit-collateral-modal" class="aqua-modal-overlay" hidden>
+  <div class="aqua-modal" role="dialog" aria-modal="true" aria-labelledby="deposit-modal-title">
+    <div class="aqua-modal-head"><h3 id="deposit-modal-title">Deposit collateral</h3><button class="aqua-modal-close" type="button" data-close-modal>Close</button></div>
+    <div class="field"><label>Token</label><select id="deposit-token-select" class="select"></select></div>
+    <div class="field"><label>Wallet balance</label><div id="deposit-token-balance" class="input"></div></div>
+    <div class="field"><label>Amount</label><input id="deposit-amount" class="input" type="text" inputmode="decimal" value=""></div>
+    <div id="deposit-action-error" class="form-note" role="alert" hidden></div>
+    <div class="split-actions"><button id="approve-collateral-button" class="btn btn-secondary" type="button">Approve token</button><button id="deposit-collateral-button" class="btn btn-primary" type="button">Deposit</button></div>
+  </div>
+</div>
+<div id="withdraw-collateral-modal" class="aqua-modal-overlay" hidden>
+  <div class="aqua-modal" role="dialog" aria-modal="true" aria-labelledby="withdraw-modal-title">
+    <div class="aqua-modal-head"><h3 id="withdraw-modal-title">Withdraw collateral</h3><button class="aqua-modal-close" type="button" data-close-modal>Close</button></div>
+    <div class="field"><label>Token</label><select id="withdraw-token-select" class="select"></select></div>
+    <div class="field"><label>Deposited balance</label><div id="withdraw-token-balance" class="input"></div></div>
+    <div class="field"><label>Amount</label><input id="withdraw-amount" class="input" type="text" inputmode="decimal" value=""></div>
+    <div id="withdraw-action-error" class="form-note" role="alert" hidden></div>
+    <div class="split-actions"><button id="withdraw-collateral-button" class="btn btn-primary" type="button">Withdraw</button></div>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
 <script src="/web3-config.js"></script>
 <script src="/web3.js"></script>
@@ -112,12 +133,16 @@ function disconnectWallet(){
   connectButton.textContent='Connect wallet';
   connectButton.title='';
   disconnectButton.style.display='none';
-  walletNetwork.textContent='Ethereum';
+  walletNetwork.textContent=configuredChain?.name || 'Ethereum';
   AquaApi.clearDashboard();
+  closeCollateralModals();
   const apiStatus=document.getElementById('api-status');
   if(apiStatus){apiStatus.textContent='API: wallet required';apiStatus.className='api-status'}
   AquaApi.loadPublicData().catch(error=>console.warn('Public API refresh failed:',error));
 }
+
+const configuredChain=window.AquaConfig?.AquaChains?.[window.AquaEnv?.chain||window.AquaConfig?.AQUA_CHAIN];
+if(configuredChain?.name) walletNetwork.textContent=configuredChain.name;
 
 connectButton.addEventListener('click', connectWallet);
 portfolioConnectButton.addEventListener('click', connectWallet);
@@ -125,20 +150,35 @@ createOrderConnectButton.addEventListener('click', connectWallet);
 disconnectButton.addEventListener('click', disconnectWallet);
 
 const depositTokenSelect=document.getElementById('deposit-token-select');
+const withdrawTokenSelect=document.getElementById('withdraw-token-select');
 const depositAmountInput=document.getElementById('deposit-amount');
+const withdrawAmountInput=document.getElementById('withdraw-amount');
 const approveCollateralButton=document.getElementById('approve-collateral-button');
 const depositCollateralButton=document.getElementById('deposit-collateral-button');
 const withdrawCollateralButton=document.getElementById('withdraw-collateral-button');
 const openDepositCollateralButton=document.getElementById('open-deposit-collateral');
 const openWithdrawCollateralButton=document.getElementById('open-withdraw-collateral');
-const collateralActionError=document.getElementById('collateral-action-error');
+const depositActionError=document.getElementById('deposit-action-error');
+const withdrawActionError=document.getElementById('withdraw-action-error');
+
+function closeCollateralModals(){
+  document.querySelectorAll('.aqua-modal-overlay').forEach(el=>{el.hidden=true});
+}
+
+function openCollateralModal(id){
+  closeCollateralModals();
+  const modal=document.getElementById(id);
+  if(!modal) return;
+  modal.hidden=false;
+  AquaApi.updateDepositBalance();
+}
 
 async function refreshPortfolioAfterTransaction(){
   if(walletAddress) await AquaApi.loadForAddress(walletAddress);
 }
 
 async function approveCollateral(){
-  const token=AquaApi.selectedCollateral();
+  const token=AquaApi.selectedCollateral('deposit-token-select');
   const amount=depositAmountInput.value.trim();
   if(!token || !amount || !walletSigner) return;
   await AquaWeb3.writeContract({
@@ -152,7 +192,7 @@ async function approveCollateral(){
 }
 
 async function depositCollateral(){
-  const token=AquaApi.selectedCollateral();
+  const token=AquaApi.selectedCollateral('deposit-token-select');
   const amount=depositAmountInput.value.trim();
   if(!token || !amount || !walletSigner) return;
   await AquaWeb3.writeContract({
@@ -166,8 +206,8 @@ async function depositCollateral(){
 }
 
 async function withdrawCollateral(){
-  const token=AquaApi.selectedCollateral();
-  const amount=depositAmountInput.value.trim();
+  const token=AquaApi.selectedCollateral('withdraw-token-select');
+  const amount=withdrawAmountInput.value.trim();
   if(!token || !amount || !walletSigner) return;
   await AquaWeb3.writeContract({
     contractKey:'app',
@@ -179,25 +219,40 @@ async function withdrawCollateral(){
   await refreshPortfolioAfterTransaction();
 }
 
-function showCollateralActionError(error){
-  if(!collateralActionError) return;
-  collateralActionError.textContent=AquaWeb3.readableError(error);
-  collateralActionError.hidden=false;
+function showCollateralActionError(error, el){
+  if(!el) return;
+  el.textContent=AquaWeb3.readableError(error);
+  el.hidden=false;
 }
 
 depositTokenSelect.addEventListener('change',()=>AquaApi.updateDepositBalance());
+withdrawTokenSelect.addEventListener('change',()=>AquaApi.updateDepositBalance());
 openDepositCollateralButton.addEventListener('click',()=>{
-  document.getElementById('deposit-token-select').scrollIntoView({behavior:'smooth',block:'center'});
+  if(!walletAddress) return connectWallet();
+  if(depositActionError) depositActionError.hidden=true;
+  openCollateralModal('deposit-collateral-modal');
   depositAmountInput.focus();
 });
 openWithdrawCollateralButton.addEventListener('click',()=>{
-  document.getElementById('deposit-token-select').scrollIntoView({behavior:'smooth',block:'center'});
-  depositAmountInput.focus();
+  if(!walletAddress) return connectWallet();
+  if(withdrawActionError) withdrawActionError.hidden=true;
+  AquaApi.preferDepositedCollateral('withdraw-token-select');
+  openCollateralModal('withdraw-collateral-modal');
+  withdrawAmountInput.focus();
 });
-approveCollateralButton.addEventListener('click',()=>approveCollateral().catch(error=>{showCollateralActionError(error); console.warn('Approve failed:',error)}));
-depositCollateralButton.addEventListener('click',()=>depositCollateral().catch(error=>{showCollateralActionError(error); console.warn('Deposit failed:',error)}));
-withdrawCollateralButton.addEventListener('click',()=>withdrawCollateral().catch(error=>{showCollateralActionError(error); console.warn('Withdraw failed:',error)}));
-depositAmountInput.addEventListener('input',()=>{if(collateralActionError) collateralActionError.hidden=true});
+approveCollateralButton.addEventListener('click',()=>approveCollateral().catch(error=>{showCollateralActionError(error,depositActionError); console.warn('Approve failed:',error)}));
+depositCollateralButton.addEventListener('click',()=>depositCollateral().catch(error=>{showCollateralActionError(error,depositActionError); console.warn('Deposit failed:',error)}));
+withdrawCollateralButton.addEventListener('click',()=>withdrawCollateral().catch(error=>{showCollateralActionError(error,withdrawActionError); console.warn('Withdraw failed:',error)}));
+depositAmountInput.addEventListener('input',()=>{if(depositActionError) depositActionError.hidden=true});
+withdrawAmountInput.addEventListener('input',()=>{if(withdrawActionError) withdrawActionError.hidden=true});
+document.addEventListener('click',e=>{
+  if(e.target.classList?.contains('aqua-modal-overlay') || e.target.closest('[data-close-modal]')){
+    closeCollateralModals();
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeCollateralModals();
+});
 
 if(window.ethereum){
   window.ethereum.on('accountsChanged', accounts=>{
@@ -234,6 +289,31 @@ document.addEventListener('click',e=>{
   }
 });
 
+function toLocalDateTimeValue(date){
+  const pad=n=>String(n).padStart(2,'0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+function defaultOrderDeadline(){
+  const d=new Date();
+  d.setFullYear(d.getFullYear()+1);
+  return toLocalDateTimeValue(d);
+}
+function applyDebtTokenLabels(){
+  const symbol=AquaApi.debtSymbol();
+  document.querySelectorAll('[data-debt-symbol]').forEach(el=>{el.textContent=symbol});
+}
+
+const showDeadline=document.getElementById('show-deadline');
+const deadlineField=document.getElementById('order-deadline-field');
+const deadlineInput=document.getElementById('order-deadline');
+if(deadlineInput && !deadlineInput.value) deadlineInput.value=defaultOrderDeadline();
+if(showDeadline && deadlineField){
+  const syncDeadlineVisibility=()=>{deadlineField.hidden=!showDeadline.checked};
+  showDeadline.addEventListener('change',syncDeadlineVisibility);
+  syncDeadlineVisibility();
+}
+applyDebtTokenLabels();
+
 function parseAmount(value){
   if(!String(value||'').trim()) return 0;
   const n=parseFloat(String(value).replace(/[^0-9.,-]/g,'').replace(',','.'));
@@ -241,7 +321,7 @@ function parseAmount(value){
 }
 function fmtAmount(n){
   if(!Number.isFinite(n) || n===0) return '';
-  return `${n.toLocaleString('en-US',{maximumFractionDigits:2})} USDT`;
+  return `${n.toLocaleString('en-US',{maximumFractionDigits:2})} ${AquaApi.debtSymbol()}`;
 }
 function fmtDeadline(value){
   if(!value) return '';

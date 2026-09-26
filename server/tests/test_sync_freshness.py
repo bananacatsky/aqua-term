@@ -27,7 +27,44 @@ def _fresh_db(tmp_path, monkeypatch):
     database.close()
 
 
-def test_orderbook_rejects_unsynced_maturity():
+def test_mark_maturities_synced_touches_indexed_markets():
+    from sync import ChainSyncer
+
+    database.upsert_borrow_order(
+        {
+            "app_address": "0x0000000000000000000000000000000000000abc",
+            "chain": "ethereum",
+            "order_id": 1,
+            "borrower": "0x1111111111111111111111111111111111111111",
+            "maturity": 1735689600,
+            "deadline": int(time.time()) + 3600,
+            "face_amount": "500",
+            "min_debt_token_out": "450",
+            "ltv_bps": 6000,
+            "collateral_id": 0,
+            "filled_face": "0",
+            "cancelled": 0,
+            "created_block": 101,
+            "quote_num": "450",
+            "quote_den": "500",
+        }
+    )
+    ChainSyncer(database).mark_maturities_synced(
+        "0x0000000000000000000000000000000000000abc",
+        "ethereum",
+        int(time.time()),
+    )
+    fresh, row = database.maturity_sync_is_fresh(
+        "0x0000000000000000000000000000000000000abc",
+        "ethereum",
+        1735689600,
+        3600,
+    )
+    assert fresh
+    assert row is not None
+
+
+def test_orderbook_returns_empty_when_unsynced():
     client = app.test_client()
     response = client.get(
         "/api/orderbook",
@@ -36,11 +73,14 @@ def test_orderbook_rejects_unsynced_maturity():
             "maturity": 1735689600,
         },
     )
-    assert response.status_code == 503
-    assert "not been synced" in response.get_json()["error"]
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["sync"]["status"] == "pending"
+    assert payload["sell"]["items"] == []
+    assert payload["buy"]["items"] == []
 
 
-def test_orderbook_rejects_stale_maturity():
+def test_orderbook_marks_stale_maturity():
     stale_at = int(time.time()) - SETTINGS.sync_max_age_seconds - 60
     database.touch_maturity_sync(
         "0x0000000000000000000000000000000000000abc",
@@ -56,5 +96,8 @@ def test_orderbook_rejects_stale_maturity():
             "maturity": 1735689600,
         },
     )
-    assert response.status_code == 503
-    assert response.get_json()["error"] == "Sync data is stale"
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["sync"]["status"] == "stale"
+    assert payload["sell"]["items"] == []
+    assert payload["buy"]["items"] == []

@@ -89,6 +89,8 @@ class ChainSyncer:
         if from_block > head:
             if SETTINGS.refresh_open_orders:
                 self.refresh_open_orders(address, chain, contract, head_ts=head_ts)
+            self.database.set_last_refresh_at(address, chain, float(head_ts))
+            self.mark_maturities_synced(address, chain, head_ts)
             return
 
         while from_block <= head:
@@ -107,6 +109,16 @@ class ChainSyncer:
         if SETTINGS.refresh_open_orders:
             self.refresh_open_orders(address, chain, contract, head_ts=head_ts)
         self.database.set_last_refresh_at(address, chain, float(head_ts))
+        self.mark_maturities_synced(address, chain, head_ts)
+
+    def mark_maturities_synced(self, address: str, chain: str, head_ts: int) -> None:
+        known = set(self.database.list_maturities(address, chain))
+        for item in SETTINGS.aquaterm_apps:
+            if item.address == address.lower() and item.chain == chain.lower():
+                known.update(item.maturities)
+                break
+        for maturity in known:
+            self.database.touch_maturity_sync(address, chain, maturity, head_ts)
 
     def _sync_block_range(
         self,

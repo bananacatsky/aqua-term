@@ -8,7 +8,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from web3 import Web3
 
-from config import SETTINGS, AppConfig
+from api import AppNotRegistered, get_market, get_orderbook, get_orders, get_portfolio
+from config import SETTINGS
 from chain import ChainReader
 from db import Database
 from sync import ChainSyncer
@@ -20,10 +21,22 @@ logging.basicConfig(
 )
 
 
+_LOCAL_FRONTEND_ORIGINS = (
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:4173",
+    "http://localhost:4173",
+)
+
+
 def _cors_origins() -> list[str] | str:
     if len(SETTINGS.cors_origins) == 1 and SETTINGS.cors_origins[0] == "*":
         return "*"
-    return list(SETTINGS.cors_origins)
+    origins = list(SETTINGS.cors_origins)
+    for origin in _LOCAL_FRONTEND_ORIGINS:
+        if origin not in origins:
+            origins.append(origin)
+    return origins
 
 
 app = Flask(__name__)
@@ -66,33 +79,15 @@ def _validate_address(value: str, *, field: str = "address") -> str:
     return Web3.to_checksum_address(value).lower()
 
 
-def _app_config_for(app_address: str, chain: str) -> AppConfig | None:
-    for item in SETTINGS.aquaterm_apps:
-        if item.address == app_address and item.chain == chain:
-            return item
-    return None
-
-
-def _require_registered_app(app_address: str, chain: str) -> dict[str, Any] | tuple[Any, int]:
-    registered = database.get_app(app_address, chain)
-    if registered is None:
-        return jsonify(
-            {
-                "error": "App is not registered for sync",
-                "hint": "Add AQUATERM_APPS=address:chain:from_block to .env",
-            }
-        ), 404
-    return registered
-
-
-def _paginated(items: list[Any], total: int, page: int, limit: int) -> dict[str, Any]:
-    return {
-        "items": items,
-        "page": page,
-        "limit": limit,
-        "total": total,
-        "pages": (total + limit - 1) // limit if total else 0,
-    }
+def _not_registered(app_address: str, chain: str) -> tuple[Any, int]:
+    return jsonify(
+        {
+            "error": "App is not registered for sync",
+            "hint": "Add AQUATERM_APPS=address:chain:from_block to .env",
+            "app": app_address,
+            "chain": chain,
+        }
+    ), 404
 
 
 @app.before_request
@@ -123,16 +118,10 @@ def market() -> Any:
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    registered = _require_registered_app(app_address, chain)
-    if isinstance(registered, tuple):
-        return registered
-
     try:
-        payload = chain_reader.read_market(
-            app_address,
-            chain,
-            app_config=_app_config_for(app_address, chain),
-        )
+        payload = get_market(database, chain_reader, app_address, chain)
+    except AppNotRegistered:
+        return _not_registered(app_address, chain)
     except ConnectionError as exc:
         return jsonify({"error": str(exc)}), 503
     except Exception:
@@ -154,18 +143,17 @@ def portfolio() -> Any:
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    registered = _require_registered_app(app_address, chain)
-    if isinstance(registered, tuple):
-        return registered
-
     try:
-        payload = chain_reader.read_portfolio(
+        payload = get_portfolio(
+            database,
+            chain_reader,
             app_address,
             chain,
             user_address,
-            app_config=_app_config_for(app_address, chain),
             include_wallet=include_wallet,
         )
+    except AppNotRegistered:
+        return _not_registered(app_address, chain)
     except ConnectionError as exc:
         return jsonify({"error": str(exc)}), 503
     except Exception:
@@ -192,40 +180,23 @@ def orders() -> Any:
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    registered = _require_registered_app(app_address, chain)
-    if isinstance(registered, tuple):
-        return registered
+    try:
+        payload = get_orders(
+            database,
+            app_address,
+            chain,
+            maker,
+            borrow_page=borrow_page,
+            supply_page=supply_page,
+            borrow_limit=borrow_limit,
+            supply_limit=supply_limit,
+            include_expired=include_expired,
+            include_closed=include_closed,
+        )
+    except AppNotRegistered:
+        return _not_registered(app_address, chain)
 
-    borrow_items, borrow_total = database.list_maker_borrow_orders(
-        app_address,
-        chain,
-        maker,
-        page=borrow_page,
-        limit=borrow_limit,
-        include_expired=include_expired,
-        include_closed=include_closed,
-    )
-    supply_items, supply_total = database.list_maker_supply_orders(
-        app_address,
-        chain,
-        maker,
-        page=supply_page,
-        limit=supply_limit,
-        include_expired=include_expired,
-        include_closed=include_closed,
-    )
-
-    return jsonify(
-        {
-            "app": app_address,
-            "chain": chain,
-            "maker": maker,
-            "borrow": _paginated(borrow_items, borrow_total, borrow_page, borrow_limit),
-            "supply": _paginated(
-                supply_items, supply_total, supply_page, supply_limit
-            ),
-        }
-    )
+    return jsonify(payload)
 
 
 @app.get("/api/orderbook")
@@ -242,70 +213,22 @@ def orderbook() -> Any:
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    registered = _require_registered_app(app_address, chain)
-    if isinstance(registered, tuple):
-        return registered
+    try:
+        payload = get_orderbook(
+            database,
+            app_address,
+            chain,
+            maturity,
+            sell_page=sell_page,
+            buy_page=buy_page,
+            sell_limit=sell_limit,
+            buy_limit=buy_limit,
+            include_expired=include_expired,
+        )
+    except AppNotRegistered:
+        return _not_registered(app_address, chain)
 
-    fresh, maturity_sync = database.maturity_sync_is_fresh(
-        app_address,
-        chain,
-        maturity,
-        SETTINGS.sync_max_age_seconds,
-    )
-    if not fresh:
-        if maturity_sync is None:
-            return jsonify(
-                {
-                    "error": "Maturity has not been synced yet",
-                    "app": app_address,
-                    "chain": chain,
-                    "maturity": maturity,
-                }
-            ), 503
-        return jsonify(
-            {
-                "error": "Sync data is stale",
-                "app": app_address,
-                "chain": chain,
-                "maturity": maturity,
-                "last_synced_at": maturity_sync["last_synced_at"],
-                "max_age_seconds": SETTINGS.sync_max_age_seconds,
-            }
-        ), 503
-
-    sell_items, sell_total = database.list_sell_orders(
-        app_address,
-        chain,
-        maturity,
-        page=sell_page,
-        limit=sell_limit,
-        include_expired=include_expired,
-    )
-    buy_items, buy_total = database.list_buy_orders(
-        app_address,
-        chain,
-        maturity,
-        page=buy_page,
-        limit=buy_limit,
-        include_expired=include_expired,
-    )
-
-    return jsonify(
-        {
-            "app": app_address,
-            "chain": chain,
-            "maturity": maturity,
-            "sync": {
-                "from_block": registered["from_block"],
-                "last_synced_block": registered["last_synced_block"],
-                "last_refresh_at": registered["last_refresh_at"],
-                "last_synced_at": maturity_sync["last_synced_at"],
-                "max_age_seconds": SETTINGS.sync_max_age_seconds,
-            },
-            "sell": _paginated(sell_items, sell_total, sell_page, sell_limit),
-            "buy": _paginated(buy_items, buy_total, buy_page, buy_limit),
-        }
-    )
+    return jsonify(payload)
 
 
 def main() -> None:
