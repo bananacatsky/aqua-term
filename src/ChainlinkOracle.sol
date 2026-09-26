@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 
-/// @notice Values WETH and WBTC collateral in USDT using three Chainlink USD feeds.
+/// @notice Values configured collateral tokens in USDT using Chainlink USD feeds.
 /// @dev Feed addresses and freshness limits are fixed at deployment; select them for the target chain.
 contract ChainlinkOracle is IOracle {
     struct FeedConfig {
@@ -22,22 +22,34 @@ contract ChainlinkOracle is IOracle {
 
     constructor(
         IERC20Metadata debtToken_,
-        IERC20Metadata[2] memory collateralTokens_,
-        AggregatorV3Interface[3] memory feeds_,
-        uint32[3] memory maxDelays_
+        IERC20Metadata[] memory collateralTokens_,
+        AggregatorV3Interface[] memory collateralFeeds_,
+        uint32[] memory collateralMaxDelays_,
+        AggregatorV3Interface debtFeed_,
+        uint32 debtMaxDelay_
     ) {
         require(address(debtToken_) != address(0), "ZERO_DEBT_TOKEN");
-        require(address(collateralTokens_[0]) != address(collateralTokens_[1]), "DUPLICATE_COLLATERAL");
+        require(collateralTokens_.length != 0, "NO_COLLATERAL");
+        require(
+            collateralTokens_.length == collateralFeeds_.length && collateralTokens_.length == collateralMaxDelays_.length,
+            "BAD_COLLATERAL_CONFIG"
+        );
+        require(address(debtFeed_) != address(0) && debtMaxDelay_ != 0, "BAD_FEED_CONFIG");
         debtToken = debtToken_;
-        for (uint256 i; i < 3; ++i) {
-            require(address(feeds_[i]) != address(0) && maxDelays_[i] != 0, "BAD_FEED_CONFIG");
-            uint8 feedDecimals = feeds_[i].decimals();
+        uint8 debtFeedDecimals = debtFeed_.decimals();
+        require(debtFeedDecimals <= 18, "FEED_DECIMALS");
+        require(debtToken_.decimals() <= 18, "TOKEN_DECIMALS");
+        debtFeed = FeedConfig(debtFeed_, debtToken_.decimals(), debtFeedDecimals, debtMaxDelay_);
+        for (uint256 i; i < collateralTokens_.length; ++i) {
+            require(address(collateralTokens_[i]) != address(0), "ZERO_COLLATERAL");
+            require(address(collateralFeeds_[i]) != address(0) && collateralMaxDelays_[i] != 0, "BAD_FEED_CONFIG");
+            require(address(collateralFeed[address(collateralTokens_[i])].feed) == address(0), "DUPLICATE_COLLATERAL");
+            uint8 feedDecimals = collateralFeeds_[i].decimals();
             require(feedDecimals <= 18, "FEED_DECIMALS");
-            uint8 tokenDecimals = i == 2 ? debtToken_.decimals() : collateralTokens_[i].decimals();
+            uint8 tokenDecimals = collateralTokens_[i].decimals();
             require(tokenDecimals <= 18, "TOKEN_DECIMALS");
-            FeedConfig memory config = FeedConfig(feeds_[i], tokenDecimals, feedDecimals, maxDelays_[i]);
-            if (i == 2) debtFeed = config;
-            else collateralFeed[address(collateralTokens_[i])] = config;
+            collateralFeed[address(collateralTokens_[i])] =
+                FeedConfig(collateralFeeds_[i], tokenDecimals, feedDecimals, collateralMaxDelays_[i]);
         }
     }
 

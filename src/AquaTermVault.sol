@@ -48,10 +48,17 @@ contract AquaTermVault is ERC4626 {
         return convertToShares(cash);
     }
 
-    function mintDebtShares(address receiver, uint256 faceAmount) external onlyApp {
+    /// @notice Preview the number of shares representing a new performing debt receivable at current NAV.
+    function previewDebtShares(uint256 faceAmount) public view returns (uint256) {
+        return convertToShares(faceAmount);
+    }
+
+    function mintDebtShares(address receiver, uint256 faceAmount) external onlyApp returns (uint256 shares) {
         require(block.timestamp < maturity, "MATURED");
+        shares = previewDebtShares(faceAmount);
+        require(shares != 0, "ZERO_DEBT_SHARES");
         totalDebt += faceAmount;
-        _mint(receiver, faceAmount);
+        _mint(receiver, shares);
     }
 
     function recordRepayment(uint256 amount, uint256 recoveredBadDebt) external onlyApp {

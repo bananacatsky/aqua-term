@@ -27,8 +27,10 @@ contract AquaTermAppTest {
     MockERC20 internal usdt;
     MockERC20 internal weth;
     MockERC20 internal wbtc;
+    MockERC20 internal alt;
     MockChainlinkFeed internal ethFeed;
     MockChainlinkFeed internal btcFeed;
+    MockChainlinkFeed internal altFeed;
     MockChainlinkFeed internal usdtFeed;
     ChainlinkOracle internal oracle;
     Aqua internal aqua;
@@ -42,32 +44,42 @@ contract AquaTermAppTest {
         usdt = new MockERC20("USDT", "USDT", 6);
         weth = new MockERC20("Wrapped Ether", "WETH", 18);
         wbtc = new MockERC20("Wrapped Bitcoin", "WBTC", 8);
+        alt = new MockERC20("Alternative Collateral", "ALT", 18);
         ethFeed = new MockChainlinkFeed(8, 1000e8);
         btcFeed = new MockChainlinkFeed(8, 100_000e8);
+        altFeed = new MockChainlinkFeed(8, 2e8);
         usdtFeed = new MockChainlinkFeed(8, 1e8);
 
-        IERC20Metadata[2] memory oracleTokens = [IERC20Metadata(address(weth)), IERC20Metadata(address(wbtc))];
-        AggregatorV3Interface[3] memory feeds = [
-            AggregatorV3Interface(address(ethFeed)),
-            AggregatorV3Interface(address(btcFeed)),
-            AggregatorV3Interface(address(usdtFeed))
-        ];
-        uint32[3] memory maxDelays = [uint32(1 days), uint32(1 days), uint32(1 days)];
-        oracle = new ChainlinkOracle(IERC20Metadata(address(usdt)), oracleTokens, feeds, maxDelays);
+        IERC20Metadata[] memory oracleTokens = new IERC20Metadata[](3);
+        oracleTokens[0] = IERC20Metadata(address(weth)); oracleTokens[1] = IERC20Metadata(address(wbtc));
+        oracleTokens[2] = IERC20Metadata(address(alt));
+        AggregatorV3Interface[] memory collateralFeeds = new AggregatorV3Interface[](3);
+        collateralFeeds[0] = AggregatorV3Interface(address(ethFeed));
+        collateralFeeds[1] = AggregatorV3Interface(address(btcFeed));
+        collateralFeeds[2] = AggregatorV3Interface(address(altFeed));
+        uint32[] memory collateralMaxDelays = new uint32[](3);
+        collateralMaxDelays[0] = 1 days; collateralMaxDelays[1] = 1 days; collateralMaxDelays[2] = 1 days;
+        oracle = new ChainlinkOracle(
+            IERC20Metadata(address(usdt)), oracleTokens, collateralFeeds, collateralMaxDelays,
+            AggregatorV3Interface(address(usdtFeed)), 1 days
+        );
         aqua = new Aqua();
 
         maturity = uint40(block.timestamp + 30 days);
-        IERC20[2] memory collateral = [IERC20(address(weth)), IERC20(address(wbtc))];
-        uint16[2] memory maxLtvs = [uint16(7000), uint16(6500)];
-        uint16[2] memory liqLtvs = [uint16(8000), uint16(7500)];
+        IERC20[] memory collateral = new IERC20[](3);
+        collateral[0] = IERC20(address(weth)); collateral[1] = IERC20(address(wbtc)); collateral[2] = IERC20(address(alt));
+        uint16[] memory maxLtvs = new uint16[](3); maxLtvs[0] = 7000; maxLtvs[1] = 6500; maxLtvs[2] = 5000;
+        uint16[] memory liqLtvs = new uint16[](3); liqLtvs[0] = 8000; liqLtvs[1] = 7500; liqLtvs[2] = 6000;
         uint40[] memory maturities = new uint40[](1); maturities[0] = maturity;
         string[] memory names = new string[](1); names[0] = "AquaTerm USDT";
         string[] memory symbols = new string[](1); symbols[0] = "USDT-TERM";
         app = new AquaTermApp(IAqua(address(aqua)), IERC20(address(usdt)), oracle, collateral, maxLtvs, liqLtvs, maturities, names, symbols);
 
         weth.mint(borrower, 1e18);
+        alt.mint(borrower, 1e18);
         usdt.mint(supplier, 2_000e6);
         vm.prank(borrower); weth.approve(address(app), type(uint256).max);
+        vm.prank(borrower); alt.approve(address(app), type(uint256).max);
         vm.prank(supplier); usdt.approve(address(aqua), type(uint256).max);
     }
 
@@ -82,14 +94,14 @@ contract AquaTermAppTest {
         return _shipAndMatchWithCollateral(face, spot, 6000, 0);
     }
 
-    function _shipAndMatchWithCollateral(uint256 face, uint256 spot, uint16 ltvBps, uint8 collateralId)
+    function _shipAndMatchWithCollateral(uint256 face, uint256 spot, uint16 ltvBps, uint256 collateralId)
         internal returns (AquaTermVault vault)
     {
         vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(spot), ltvBps, collateralId);
         vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(spot), uint128(face));
         vault = app.vaultForMaturity(maturity);
         vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
-        _ship(borrower, app.borrowStrategyBytes(bId), address(vault), face);
+        _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(face));
         _ship(supplier, app.supplyStrategyBytes(sId), address(usdt), spot);
         app.matchOrders(bId, sId, face, spot);
     }
@@ -150,12 +162,22 @@ contract AquaTermAppTest {
         _assertEq(weth.balanceOf(borrower), 1e18, "wallet restored");
     }
 
+    function testCollateralCountIsConfigurable() public {
+        _assertEq(app.N_COLLATERAL(), 3, "three configured collateral types");
+        vm.startPrank(borrower);
+        app.depositCollateral(2, 1e18);
+        _assertEq(app.collateralValue(borrower), 2e6, "third collateral is valued");
+        app.withdrawCollateral(2, 1e18);
+        vm.stopPrank();
+        _assertEq(app.depositedCollateral(borrower, 2), 0, "third collateral can be withdrawn");
+    }
+
     function testOverCapacityFillRevertsAtomically() public {
         _shipAndMatch(FACE, SPOT);
         vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, 600e6, 576e6, 6000, 0);
         vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, 576e6, 600e6);
         AquaTermVault vault = app.vaultForMaturity(maturity);
-        _ship(borrower, app.borrowStrategyBytes(bId), address(vault), 600e6);
+        _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(600e6));
         _ship(supplier, app.supplyStrategyBytes(sId), address(usdt), 576e6);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "INSUFFICIENT_WALLET_COLLATERAL"));
         app.matchOrders(bId, sId, 600e6, 576e6);
@@ -172,6 +194,7 @@ contract AquaTermAppTest {
         _assertEq(vault.maxRedeem(supplier), 0, "no cash to redeem");
         ethFeed.setAnswer(1000e8);
         btcFeed.setAnswer(100_000e8);
+        altFeed.setAnswer(2e8);
         usdtFeed.setAnswer(1e8);
         uint256 lockedCollateral = app.depositedCollateral(borrower, 0);
         vm.prank(borrower);
@@ -180,6 +203,87 @@ contract AquaTermAppTest {
         vm.startPrank(borrower); usdt.approve(address(app), FACE); app.repay(maturity, 200e6); vm.stopPrank();
         _assertEq(vault.totalAssets(), FACE, "late recovery restores NAV");
         _assertEq(vault.badDebt(), 0, "recovered write-down cleared");
+    }
+
+    function testHealthyLiquidationRepaysDebtAndTransfersDiscountedCollateral() public {
+        AquaTermVault vault = _shipAndMatch(FACE, SPOT);
+        ethFeed.setAnswer(400e8);
+        address liquidator = address(0x11A);
+        uint256 repayAmount = 100e6;
+        usdt.mint(liquidator, repayAmount);
+        vm.prank(liquidator); usdt.approve(address(app), repayAmount);
+
+        uint256 liquidatorWethBefore = weth.balanceOf(liquidator);
+        uint256 borrowerCollateralBefore = app.depositedCollateral(borrower, 0);
+        vm.prank(liquidator);
+        uint256 seized = app.liquidate(borrower, maturity, 0, repayAmount, "");
+
+        _assertEq(app.totalDebt(borrower), FACE - repayAmount, "liquidation reduces borrower debt");
+        _assertEq(app.debtByVault(borrower, address(vault)), FACE - repayAmount, "maturity debt reduced");
+        _assertEq(vault.totalAssets(), FACE, "cash replaces repaid receivable");
+        _assertEq(app.depositedCollateral(borrower, 0), borrowerCollateralBefore - seized, "collateral accounting reduced");
+        require(seized != 0 && weth.balanceOf(liquidator) == liquidatorWethBefore + seized, "liquidator receives WETH");
+        _assertEq(usdt.balanceOf(liquidator), 0, "liquidator funds repayment");
+    }
+
+    function testBadDebtLossStaysWithLegacySupplierCohort() public {
+        uint256 oldFace = 100e6;
+        uint256 oldSpot = 98e6;
+        AquaTermVault vault = _shipAndMatchWithCollateral(oldFace, oldSpot, 6000, 0);
+
+        // The collateral falls below the amount needed to cover the liquidation at the maximum discount.
+        ethFeed.setAnswer(600e8);
+        address liquidator = address(0x11A);
+        uint256 recovered = 98e6;
+        usdt.mint(liquidator, recovered);
+        vm.prank(liquidator); usdt.approve(address(app), recovered);
+        vm.prank(liquidator); app.liquidate(borrower, maturity, 0, recovered, "");
+
+        _assertEq(app.debtByVault(borrower, address(vault)), 2e6, "uncovered residual borrower debt remains");
+        _assertEq(app.depositedCollateral(borrower, 0), 0, "liquidation exhausted borrower collateral");
+        _assertEq(vault.badDebt(), 2e6, "uncovered debt is written down once");
+        _assertEq(vault.totalAssets(), 98e6, "legacy NAV reflects loss");
+        _assertEq(vault.balanceOf(supplier), oldFace, "legacy cohort keeps original shares");
+
+        // A later loan is capitalized at the then-current NAV, so its supplier does not inherit the old loss.
+        ethFeed.setAnswer(1000e8);
+        address laterBorrower = address(0xB022);
+        address laterSupplier = address(0x5A112);
+        weth.mint(laterBorrower, 1e18);
+        usdt.mint(laterSupplier, 2_000e6);
+        vm.prank(laterBorrower); weth.approve(address(app), type(uint256).max);
+        vm.prank(laterSupplier); usdt.approve(address(aqua), type(uint256).max);
+        uint256 newFace = 100e6;
+        uint256 newSpot = 98e6;
+        vm.prank(laterBorrower);
+        (uint256 bId,) = app.createBorrowOrder(maturity, uint128(newFace), uint128(newSpot), 6000, 0);
+        uint256 newShares = vault.previewDebtShares(newFace);
+        vm.prank(laterSupplier);
+        (uint256 sId,) = app.createSupplyOrder(maturity, uint128(newSpot), uint128(newShares));
+        vm.prank(laterBorrower); vault.approve(address(aqua), type(uint256).max);
+        _ship(laterBorrower, app.borrowStrategyBytes(bId), address(vault), newShares);
+        _ship(laterSupplier, app.supplyStrategyBytes(sId), address(usdt), newSpot);
+        app.matchOrders(bId, sId, newFace, newSpot);
+        _assertEq(vault.balanceOf(laterSupplier), newShares, "late supplier receives NAV-priced shares");
+        require(newShares > newFace, "shares account for the prior loss");
+
+        // Repay the performing loan. At maturity each cohort exits against its own share price.
+        usdt.mint(laterBorrower, newFace - newSpot);
+        vm.startPrank(laterBorrower);
+        usdt.approve(address(app), newFace);
+        app.repay(maturity, newFace);
+        vm.stopPrank();
+        vm.warp(maturity);
+        uint256 oldBalanceBefore = usdt.balanceOf(supplier);
+        vm.prank(supplier);
+        vault.redeem(oldFace, supplier, supplier);
+        uint256 oldPayout = usdt.balanceOf(supplier) - oldBalanceBefore;
+        uint256 lateBalanceBefore = usdt.balanceOf(laterSupplier);
+        vm.prank(laterSupplier);
+        vault.redeem(newShares, laterSupplier, laterSupplier);
+        uint256 latePayout = usdt.balanceOf(laterSupplier) - lateBalanceBefore;
+        require(oldPayout >= 98e6 - 2 && oldPayout <= 98e6 + 2, "legacy cohort absorbs bad debt");
+        require(latePayout >= 100e6 - 2 && latePayout <= 100e6 + 2, "late cohort exits at par");
     }
 
     function testChainlinkOracleUsesDecimalsAndUSDTPrice() public {
