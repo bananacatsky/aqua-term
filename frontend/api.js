@@ -2,6 +2,9 @@ const AquaApi={
   baseUrl:window.AQUA_API_BASE||'http://127.0.0.1:5002/api',
   appAddress:'0x0000000000000000000000000000000000000abc',
   requestId:0,
+  market:null,
+  portfolio:null,
+  currentAddress:null,
 
   async request(path,params={}){
     const url=new URL(`${this.baseUrl}/${path.replace(/^\//,'')}`);
@@ -23,6 +26,9 @@ const AquaApi={
       ...market.maturities.map(item=>this.request('orderbook',{app:params.app,chain:params.chain,maturity:item.timestamp})),
     ]);
     if(requestId!==this.requestId) return null;
+    this.market=market;
+    this.portfolio=portfolio;
+    this.currentAddress=address;
     this.renderMarket(market);
     const createOrder=document.getElementById('create-order');
     if(createOrder) createOrder.classList.remove('wallet-disconnected');
@@ -49,6 +55,9 @@ const AquaApi={
 
   clearDashboard(){
     this.requestId+=1;
+    this.market=null;
+    this.portfolio=null;
+    this.currentAddress=null;
     const portfolio=document.getElementById('portfolio');
     if(portfolio) portfolio.classList.add('wallet-disconnected');
     const createOrder=document.getElementById('create-order');
@@ -63,6 +72,11 @@ const AquaApi={
     if(maturitySelect) maturitySelect.replaceChildren();
     const collateralSelect=document.querySelector('#borrow-fields select');
     if(collateralSelect) collateralSelect.replaceChildren();
+    const depositSelect=document.getElementById('deposit-token-select');
+    if(depositSelect) depositSelect.replaceChildren();
+    ['deposit-token-balance','deposited-token-balance'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.textContent='';
+    });
     document.querySelectorAll('.maturity-tab').forEach(tab=>{tab.textContent='';tab.hidden=false;});
     document.querySelectorAll('#portfolio > .grid, #portfolio > .card').forEach(section=>{section.hidden=true;});
     const portfolioHead=document.querySelector('#portfolio > .page-head');
@@ -76,6 +90,11 @@ const AquaApi={
     if(maturitySelect) maturitySelect.innerHTML=data.maturities.map(item=>`<option value="${item.timestamp}">${item.label}</option>`).join('');
     const collateralSelect=document.querySelector('#borrow-fields select');
     if(collateralSelect) collateralSelect.innerHTML=data.collaterals.map(item=>`<option value="${item.id}">${item.symbol}</option>`).join('');
+    const depositSelect=document.getElementById('deposit-token-select');
+    if(depositSelect){
+      depositSelect.innerHTML=data.collaterals.map(item=>`<option value="${item.id}">${item.symbol}</option>`).join('');
+      this.updateDepositBalance();
+    }
     document.querySelectorAll('.maturity-tab').forEach((tab,index)=>{
       const maturity=data.maturities[index];
       if(maturity) { tab.textContent=maturity.label; tab.hidden=false; }
@@ -115,6 +134,7 @@ const AquaApi={
     const collateral=data.collateral.reduce((map,item)=>(map[item.token.symbol.toLowerCase()]=item.amount,map),{});
     set('collateral-weth-amount',`${(Number(collateral.weth||0)/1e18).toFixed(2)} WETH`);
     set('collateral-wbtc-amount',`${(Number(collateral.wbtc||0)/1e8).toFixed(3)} WBTC`);
+    this.updateDepositBalance();
 
     const debts=document.getElementById('debts-list');
     if(debts) debts.innerHTML=data.debts.map(item=>`<div class="position-row"><div><div class="num">Debt · ${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${usdt(item.face_debt)}</div><div class="muted">Outstanding</div></div><div><div class="num">${usdt(item.written_down)}</div><div class="muted">Written down</div></div><button class="btn btn-primary">Repay</button></div>`).join('');
@@ -124,6 +144,22 @@ const AquaApi={
     if(collateralList) collateralList.innerHTML=data.collateral.map(item=>`<div class="token-row"><div class="token"><div class="coin">${item.token.symbol}</div><div><div class="num">${item.token.symbol==='WETH'?(Number(item.amount)/1e18).toFixed(3):(Number(item.amount)/1e8).toFixed(3)} ${item.token.symbol}</div><div class="muted">Deposited</div></div></div><div><div class="num">${(Number(data.risk.collateral_value)/1e6).toLocaleString('en-US')} USDT</div><div class="muted">Portfolio value</div></div></div>`).join('');
     const walletList=document.getElementById('wallet-list');
     if(walletList) walletList.innerHTML=data.wallet.map(item=>`<div class="token-row"><div class="token"><div class="coin">${item.token.symbol}</div><div><div class="num">${item.token.symbol==='USDT'?(Number(item.amount)/1e6).toFixed(2):(item.token.symbol==='WETH'?(Number(item.amount)/1e18).toFixed(3):(Number(item.amount)/1e8).toFixed(3))} ${item.token.symbol}</div><div class="muted">Wallet</div></div></div><div class="num">—</div></div>`).join('');
+  },
+
+  selectedCollateral(){
+    const select=document.getElementById('deposit-token-select');
+    const id=Number(select?.value);
+    return this.market?.collaterals?.find(item=>item.id===id)||null;
+  },
+
+  updateDepositBalance(){
+    const token=this.selectedCollateral();
+    const walletBalanceEl=document.getElementById('deposit-token-balance');
+    const depositedBalanceEl=document.getElementById('deposited-token-balance');
+    const walletItem=this.portfolio?.wallet?.find(entry=>entry.token.symbol===token?.symbol);
+    const depositedItem=this.portfolio?.collateral?.find(entry=>entry.token.symbol===token?.symbol);
+    if(walletBalanceEl) walletBalanceEl.textContent=token&&walletItem?`${ethers.formatUnits(walletItem.amount,token.decimals)} ${token.symbol}`:'';
+    if(depositedBalanceEl) depositedBalanceEl.textContent=token&&depositedItem?`${ethers.formatUnits(depositedItem.amount,token.decimals)} ${token.symbol}`:'';
   },
 
   renderOpenOrders(data){

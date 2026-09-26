@@ -68,6 +68,7 @@ const AquaABIs={
   app:[
     'function depositCollateral(uint256 collateralId,uint256 amount)',
     'function withdrawCollateral(uint256 collateralId,uint256 amount)',
+    'function depositedCollateral(address,uint256) view returns (uint256)',
     'function collateralValue(address borrower) view returns (uint256)',
     'function portfolioWeightedMaxBorrowLtv(address borrower) view returns (uint256)',
     'function portfolioWeightedLiquidationLtv(address borrower) view returns (uint256)',

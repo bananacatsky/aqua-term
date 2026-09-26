@@ -40,6 +40,22 @@
     hashLink.href=hash?`${AquaConfig.AquaChains[chainKey]?.explorer||''}/tx/${hash}`:'#';
   }
 
+  function readableError(error){
+    const raw=[error?.shortMessage,error?.reason,error?.message,error?.data?.message,error?.info?.error?.message]
+      .filter(Boolean).join(' ');
+    const normalized=raw.toLowerCase();
+    if(normalized.includes('insufficient_collateral') || normalized.includes('insufficient collateral')){
+      return 'Insufficient deposited collateral. Reduce the withdrawal amount or repay debt first.';
+    }
+    if(normalized.includes('unhealthy')){
+      return 'This withdrawal would make your collateral position unhealthy.';
+    }
+    if(normalized.includes('insufficient_wallet_collateral')){
+      return 'Your wallet does not have enough collateral for this operation.';
+    }
+    return raw||'Unknown blockchain error';
+  }
+
   async function executeTransaction({label='Transaction',chainKey=AquaConfig.AQUA_CHAIN,action}){
     if(activeTransaction) throw new Error('Another transaction is already in progress');
     activeTransaction=true;
@@ -54,7 +70,7 @@
       return receipt;
     }catch(error){
       const rejected=error?.code===4001 || error?.code==='ACTION_REJECTED';
-      updateTransactionUi({title:rejected?'Transaction cancelled':'Transaction failed',message:rejected?'You rejected the request':(error?.shortMessage||error?.reason||error?.message||'Unknown blockchain error'),state:'error',chainKey});
+      updateTransactionUi({title:rejected?'Transaction cancelled':'Transaction failed',message:rejected?'You rejected the request':readableError(error),state:'error',chainKey});
       throw error;
     }finally{
       activeTransaction=false;
@@ -108,6 +124,10 @@
   async function writeContract({contractKey,address,abi,functionName,args=[],overrides={},chainKey=AquaConfig.AQUA_CHAIN,wait=true,label=functionName}){
     const send=async()=>{
       const contract=getContract({contractKey,address,abi,chainKey,write:true});
+      const from=await signer.getAddress();
+      // Run the exact call as a read first, so wallet confirmation is only shown
+      // when the transaction is expected to succeed.
+      await getProvider().call({to:contract.target,data:contract.interface.encodeFunctionData(functionName,args),from,...overrides});
       return contract[functionName](...args,overrides);
     };
     if(wait) return executeTransaction({
@@ -140,5 +160,5 @@
   }
 
   window.AquaTx={executeTransaction,isBusy:()=>activeTransaction};
-  window.AquaWeb3={setWalletProvider,getProvider,getAddress,getContract,readContract,simulateContract,writeContract,formatTokenAmount,parseTokenAmount,tokenAmount,formatToken};
+  window.AquaWeb3={setWalletProvider,getProvider,getAddress,getContract,readContract,simulateContract,writeContract,formatTokenAmount,parseTokenAmount,tokenAmount,formatToken,readableError};
 })();
