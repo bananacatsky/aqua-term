@@ -17,11 +17,11 @@ forge test
 
 The `lib/` directory contains downloaded dependencies and is ignored by Git. `remappings.txt` pins the import paths. Foundry needs Solidity 0.8.30 because the published Aqua implementation uses that exact compiler version. The target EVM is Cancun, which supports Aqua's transient-storage reentrancy locks.
 
-The tests deploy the real `Aqua` contract, ship strategies using its actual `ship(app, strategy, tokens, amounts)` API, and settle with `pull()`. They cover loan origination, ERC-4626 redemption, over-capacity rejection, write-down and late recovery, and Chainlink price validity.
+The tests deploy the real `Aqua` contract, ship strategies using its actual `ship(app, strategy, tokens, amounts)` API, and settle with `pull()`. They cover loan origination, just-in-time collateral pulls, existing and partial collateral deposits, insufficient wallet collateral, ERC-4626 redemption, write-down and late recovery, and Chainlink price validity.
 
 ## Contracts
 
-`AquaTermApp` creates one `AquaTermVault` per maturity. A borrower posts an order backed by collateral, a supplier posts a USDT offer, and both ship their corresponding virtual balances into Aqua. An order match checks portfolio LTV, mints the maturity shares, and atomically pulls shares and USDT through Aqua. Posting or shipping alone creates no debt.
+`AquaTermApp` creates one `AquaTermVault` per maturity. A borrower posts an order with a maximum resulting LTV and chooses WETH or WBTC for any wallet top-up; a supplier posts a USDT offer. Both ship their corresponding virtual balances into Aqua. At a match, the app counts the borrower's existing collateral deposits and transfers only the shortfall from the chosen wallet token. It checks the order LTV and token-weighted protocol limits, mints maturity shares, and atomically pulls shares and USDT through Aqua. Posting or shipping alone creates no debt or collateral transfer. Borrowers can still use `depositCollateral()` and `withdrawCollateral()` independently.
 
 `AquaTermVault` inherits OpenZeppelin ERC-4626. Its `totalAssets()` includes cash plus outstanding loans minus write-downs. Shares are minted only when a loan fills, so direct `deposit()` and `mint()` are disabled. `withdraw()` and `redeem()` become available at maturity, limited by the vault's actual USDT cash. A write-down lowers share value but does not forgive the borrower's debt or release collateral; a later repayment restores the written-down value.
 

@@ -67,10 +67,7 @@ contract AquaTermAppTest {
 
         weth.mint(borrower, 1e18);
         usdt.mint(supplier, 2_000e6);
-        vm.startPrank(borrower);
-        weth.approve(address(app), type(uint256).max);
-        app.depositCollateral(0, 1e18);
-        vm.stopPrank();
+        vm.prank(borrower); weth.approve(address(app), type(uint256).max);
         vm.prank(supplier); usdt.approve(address(aqua), type(uint256).max);
     }
 
@@ -82,7 +79,13 @@ contract AquaTermAppTest {
     }
 
     function _shipAndMatch(uint256 face, uint256 spot) internal returns (AquaTermVault vault) {
-        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(spot), 6000);
+        return _shipAndMatchWithCollateral(face, spot, 6000, 0);
+    }
+
+    function _shipAndMatchWithCollateral(uint256 face, uint256 spot, uint16 ltvBps, uint8 collateralId)
+        internal returns (AquaTermVault vault)
+    {
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(spot), ltvBps, collateralId);
         vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(spot), uint128(face));
         vault = app.vaultForMaturity(maturity);
         vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
@@ -95,8 +98,11 @@ contract AquaTermAppTest {
         AquaTermVault vault = app.vaultForMaturity(maturity);
         _assertEq(vault.totalSupply(), 0, "shares before fill");
         _assertEq(app.totalDebt(borrower), 0, "debt before fill");
+        _assertEq(app.depositedCollateral(borrower, 0), 0, "no collateral at order time");
         _assertEq(vault.maxDeposit(supplier), 0, "direct deposits closed");
         vault = _shipAndMatch(FACE, SPOT);
+        _assertEq(app.depositedCollateral(borrower, 0), 833_333_334_000_000_000, "collateral pulled JIT");
+        _assertEq(weth.balanceOf(borrower), 166_666_666_000_000_000, "only required collateral taken");
         _assertEq(vault.asset(), address(usdt), "ERC4626 asset");
         _assertEq(vault.balanceOf(supplier), FACE, "supplier receives shares");
         _assertEq(vault.totalAssets(), FACE, "NAV includes receivable");
@@ -111,14 +117,47 @@ contract AquaTermAppTest {
         _assertEq(usdt.balanceOf(supplier), 2_000e6 + 20e6, "supplier earns discount");
     }
 
+    function testExistingCollateralNeedsNoAdditionalWalletTransfer() public {
+        vm.prank(borrower); app.depositCollateral(0, 1e18);
+        _assertEq(weth.balanceOf(borrower), 0, "collateral deposited in advance");
+        _shipAndMatch(FACE, SPOT);
+        _assertEq(app.depositedCollateral(borrower, 0), 1e18, "existing deposit is enough");
+        _assertEq(weth.balanceOf(borrower), 0, "no additional wallet transfer");
+    }
+
+    function testPartialDepositPullsOnlyShortfall() public {
+        vm.prank(borrower); app.depositCollateral(0, 5e17);
+        _shipAndMatch(FACE, SPOT);
+        _assertEq(app.depositedCollateral(borrower, 0), 833_333_334_000_000_000, "old and new collateral combined");
+        _assertEq(weth.balanceOf(borrower), 166_666_666_000_000_000, "only shortfall taken");
+    }
+
+    function testChosenTokenAndProtocolLtvLimit() public {
+        wbtc.mint(borrower, 1e6);
+        vm.prank(borrower); wbtc.approve(address(app), type(uint256).max);
+        _shipAndMatchWithCollateral(FACE, SPOT, 7000, 1);
+        _assertEq(app.depositedCollateral(borrower, 0), 0, "WETH left untouched");
+        _assertEq(app.depositedCollateral(borrower, 1), 769_231, "WBTC pulled to protocol limit");
+        require(app.currentLtv(borrower) <= 6500, "protocol LTV breached");
+    }
+
+    function testManualDepositAndWithdrawalStillWork() public {
+        vm.startPrank(borrower);
+        app.depositCollateral(0, 5e17);
+        app.withdrawCollateral(0, 5e17);
+        vm.stopPrank();
+        _assertEq(app.depositedCollateral(borrower, 0), 0, "manual deposit withdrawn");
+        _assertEq(weth.balanceOf(borrower), 1e18, "wallet restored");
+    }
+
     function testOverCapacityFillRevertsAtomically() public {
         _shipAndMatch(FACE, SPOT);
-        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, 600e6, 576e6, 6000);
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, 600e6, 576e6, 6000, 0);
         vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, 576e6, 600e6);
         AquaTermVault vault = app.vaultForMaturity(maturity);
         _ship(borrower, app.borrowStrategyBytes(bId), address(vault), 600e6);
         _ship(supplier, app.supplyStrategyBytes(sId), address(usdt), 576e6);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "BORROWER_LTV"));
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "INSUFFICIENT_WALLET_COLLATERAL"));
         app.matchOrders(bId, sId, 600e6, 576e6);
         _assertEq(app.totalDebt(borrower), FACE, "failed fill changes no debt");
     }
@@ -134,9 +173,10 @@ contract AquaTermAppTest {
         ethFeed.setAnswer(1000e8);
         btcFeed.setAnswer(100_000e8);
         usdtFeed.setAnswer(1e8);
+        uint256 lockedCollateral = app.depositedCollateral(borrower, 0);
         vm.prank(borrower);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "UNHEALTHY"));
-        app.withdrawCollateral(0, 1e18);
+        app.withdrawCollateral(0, lockedCollateral);
         vm.startPrank(borrower); usdt.approve(address(app), FACE); app.repay(maturity, 200e6); vm.stopPrank();
         _assertEq(vault.totalAssets(), FACE, "late recovery restores NAV");
         _assertEq(vault.badDebt(), 0, "recovered write-down cleared");
