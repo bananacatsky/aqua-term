@@ -25,7 +25,38 @@ const AquaChains={
     key:'arbitrum', chainId:42161, name:'Arbitrum One', currency:'ETH',
     rpcUrl:'https://arb1.arbitrum.io/rpc', explorer:'https://arbiscan.io',
   },
+  sonic:{
+    key:'sonic', chainId:146, name:'Sonic', currency:'S',
+    rpcUrl:'https://rpc.soniclabs.com', explorer:'https://sonicscan.org',
+  },
 };
+
+const AquaChainNames={
+  1:'Ethereum',
+  10:'Optimism',
+  56:'BNB Smart Chain',
+  137:'Polygon',
+  146:'Sonic',
+  8453:'Base',
+  42161:'Arbitrum One',
+  43114:'Avalanche',
+  11155111:'Sepolia',
+  84532:'Base Sepolia',
+  421614:'Arbitrum Sepolia',
+  11155420:'OP Sepolia',
+  57054:'Sonic Blaze',
+};
+
+function chainLabel(chainId, fallbackName){
+  const id=Number(chainId);
+  const fromConfig=Object.values(AquaChains).find(item=>Number(item.chainId)===id);
+  if(fromConfig?.name) return fromConfig.name;
+  if(AquaChainNames[id]) return AquaChainNames[id];
+  if(fallbackName && fallbackName!=='unknown'){
+    return fallbackName.charAt(0).toUpperCase()+fallbackName.slice(1);
+  }
+  return Number.isFinite(id) ? `Chain ${id}` : 'Unknown network';
+}
 
 // Overridden by window.AquaEnv.chain when env-config.js is present.
 let AQUA_CHAIN='ethereum';
@@ -128,4 +159,4 @@ const AquaABIs={
   }
 })();
 
-window.AquaConfig={ZERO_ADDRESS,AquaChains,get AQUA_CHAIN(){return AQUA_CHAIN},AquaContracts,AquaTokens,AquaMaturities,AquaABIs};
+window.AquaConfig={ZERO_ADDRESS,AquaChains,AquaChainNames,chainLabel,get AQUA_CHAIN(){return AQUA_CHAIN},AquaContracts,AquaTokens,AquaMaturities,AquaABIs};

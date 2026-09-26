@@ -127,6 +127,36 @@ const AquaApi={
     return `${value.toLocaleString('en-US',{maximumFractionDigits:digits})} ${symbol}`;
   },
 
+  formatHealthFactor(risk){
+    const raw=risk?.health_factor;
+    if(risk?.health_status==='no_debt' || raw==null || raw==='' || raw==='no_debt' || raw==='no-debt') return '∞';
+    return String(raw);
+  },
+
+  formatHealthStatus(status){
+    if(status==='no_debt') return 'No debt';
+    if(!status) return '';
+    return String(status).replace(/_/g,' ');
+  },
+
+  isZeroAmount(value){
+    if(value==null || value==='') return true;
+    try{ return BigInt(value)===0n; }
+    catch{ return Number(value)===0; }
+  },
+
+  hasNonZero(items, pick){
+    return (items||[]).some(item=>{
+      const value=typeof pick==='function'?pick(item):item?.[pick];
+      return !this.isZeroAmount(value);
+    });
+  },
+
+  setSectionHidden(id, hidden){
+    const el=document.getElementById(id);
+    if(el) el.hidden=!!hidden;
+  },
+
   clearDashboard(){
     this.requestId+=1;
     this.market=null;
@@ -219,16 +249,23 @@ const AquaApi={
     set('wallet-balance-value',data.wallet_value_usd_cents==null?'':usdCents(data.wallet_value_usd_cents));
     set('debt-value',this.formatDebt(data.risk.total_debt));
     set('collateral-value',this.formatUsdFromDebt(data.risk.collateral_value));
-    set('health-factor-value',data.risk.health_factor||'');
+    set('health-factor-value',this.formatHealthFactor(data.risk));
     set('current-ltv-value',`${(data.risk.current_ltv_bps/100).toFixed(1)}%`);
     set('borrow-limit-value',`${(data.risk.max_borrow_ltv_bps/100).toFixed(0)}%`);
     set('liquidation-limit-value',`${(data.risk.liquidation_ltv_bps/100).toFixed(0)}%`);
-    set('health-factor-risk-value',data.risk.health_factor||'');
-    const statusClass=data.risk.health_status==='healthy'?'green':(data.risk.health_status==='unhealthy'?'gray':'orange');
-    ['health-status-pill','health-status-section'].forEach(id=>{const el=document.getElementById(id);if(el){el.className=`pill ${statusClass}`;el.textContent=data.risk.health_status||'';}});
+    set('health-factor-risk-value',this.formatHealthFactor(data.risk));
+    const statusClass=data.risk.health_status==='unhealthy'?'gray':(data.risk.health_status==='healthy'||data.risk.health_status==='no_debt'?'green':'orange');
+    ['health-status-pill','health-status-section'].forEach(id=>{const el=document.getElementById(id);if(el){el.className=`pill ${statusClass}`;el.textContent=this.formatHealthStatus(data.risk.health_status);}});
     set('health-description',data.risk.health_message||'');
     const riskbar=document.getElementById('riskbar-value');
     if(riskbar) riskbar.style.width=`${Math.max(0,Math.min(100,Number(data.risk.risk_percent||0)))}%`;
+    const noDebt=data.risk.health_status==='no_debt' || this.isZeroAmount(data.risk.total_debt);
+    this.setSectionHidden('borrowing-health', noDebt);
+    this.setSectionHidden('collateral-panel', !this.hasNonZero(data.collateral,'amount'));
+    this.setSectionHidden('wallet-panel', !this.hasNonZero(data.wallet,'amount'));
+    const collateralHidden=document.getElementById('collateral-panel')?.hidden;
+    const walletHidden=document.getElementById('wallet-panel')?.hidden;
+    this.setSectionHidden('balances-grid', !!(collateralHidden && walletHidden));
     this.updateDepositBalance();
 
     const debts=document.getElementById('debts-list');
@@ -289,6 +326,7 @@ const AquaApi={
       ...(data.supply?.items||[]).map(item=>`<div class="order-row"><div><div class="num">Lend · ${this.maturityLabel(item.maturity)}</div><div class="muted">Open order</div></div><div class="num">${this.formatDebt(item.remaining_debt_token||item.debt_token_in)}</div><span class="pill orange">Open</span></div>`),
     ];
     openOrders.innerHTML=rows.length?rows.join(''):'<div class="muted">No open orders.</div>';
+    this.setSectionHidden('my-open-orders', !rows.length);
   },
 
   renderOrderbook(data,showMatch=false){
