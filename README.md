@@ -28,3 +28,13 @@ The tests deploy the real `Aqua` contract, ship strategies using its actual `shi
 `ChainlinkOracle` reads one configured USD feed per collateral token and one for USDT. Its constructor takes the token/feed arrays and maximum permitted age for each feed. It rejects missing, non-positive, incomplete, future-dated or stale answers, and converts token decimals into USDT's native units. Feed addresses and age limits must be selected for the deployment network.
 
 An unhealthy borrower can be liquidated against one maturity's debt and one collateral token. After maturity, outstanding debt can also be liquidated when the borrower is healthy. The liquidator receives collateral at the configured per-token liquidation discount, pays the debt token into that maturity vault, and may use a callback to exchange collateral and fund repayment atomically. If all of the borrower's collateral is exhausted, remaining performing debt across maturities is written down, while the borrower still owes it and later repayment restores vault value. The contracts and tests have not been audited.
+
+## Mock API and frontend
+
+For local frontend development, run the deterministic Python mock API:
+
+```bash
+python3 server/mock_app.py
+```
+
+It listens on `http://127.0.0.1:5002` and exposes the same read endpoints as the chain-backed API: `/api/health`, `/api/market`, `/api/portfolio`, `/api/orders` and `/api/orderbook`. The static frontend requests this API automatically. To use another API URL, define `window.AQUA_API_BASE` before loading `api.js`.

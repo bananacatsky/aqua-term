@@ -10,7 +10,7 @@ from typing import Any
 from web3 import Web3
 from web3.contract import Contract
 
-from config import AppConfig
+from config import SETTINGS, AppConfig
 from db import Database
 from sync import load_contract, make_web3
 
@@ -289,13 +289,27 @@ class ChainReader:
                         }
                     )
 
+        wallet_prices = {
+            "USDT": SETTINGS.usdt_usd_cents,
+            "WETH": SETTINGS.weth_usd_cents,
+            "WBTC": SETTINGS.wbtc_usd_cents,
+        }
+        wallet_value_usd = sum(
+            int(item["amount"]) * wallet_prices.get(item["token"]["symbol"], 0)
+            // (10 ** int(item["token"]["decimals"]))
+            for item in wallet
+        )
+
         health_display = _health_factor_display(health_wad, total_debt)
         if total_debt == 0:
             health_status = "no_debt"
+            health_message = "No active debt."
         elif health_wad >= _WAD:
             health_status = "healthy"
+            health_message = "Your position is currently healthy."
         else:
             health_status = "unhealthy"
+            health_message = "Your position requires attention."
 
         return {
             "address": user_address.lower(),
@@ -308,6 +322,8 @@ class ChainReader:
                 "health_factor_wad": str(health_wad),
                 "health_factor": health_display,
                 "health_status": health_status,
+                "health_message": health_message,
+                "risk_percent": current_ltv / 100,
                 "current_ltv_bps": current_ltv,
                 "max_borrow_ltv_bps": max_borrow_ltv,
                 "liquidation_ltv_bps": liquidation_ltv,
@@ -316,4 +332,5 @@ class ChainReader:
             "debts": debts,
             "lending": lending,
             "wallet": wallet,
+            "wallet_value_usd_cents": str(wallet_value_usd),
         }
