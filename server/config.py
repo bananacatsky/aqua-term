@@ -35,7 +35,7 @@ def parse_csv(raw: str) -> tuple[str, ...]:
 
 def parse_apps(raw: str) -> tuple[AppConfig, ...]:
     apps: list[AppConfig] = []
-    for item in raw.split(","):
+    for item in raw.split(";"):
         item = item.strip()
         if not item:
             continue
@@ -43,7 +43,8 @@ def parse_apps(raw: str) -> tuple[AppConfig, ...]:
         if len(parts) not in (3, 4):
             raise ValueError(
                 f"Invalid AQUATERM_APPS entry {item!r}; "
-                "expected address:chain:from_block[:maturity_ts,maturity_ts,...]"
+                "expected address:chain:from_block[:maturity_ts,maturity_ts,...] "
+                "(separate multiple apps with ';')"
             )
         address, chain, from_block = parts[0], parts[1], parts[2]
         maturities: tuple[int, ...] = ()
@@ -58,6 +59,9 @@ def parse_apps(raw: str) -> tuple[AppConfig, ...]:
 @dataclass(frozen=True)
 class Settings:
     eth_rpc_url: str = os.getenv("ETH_RPC_URL", "https://ethereum-rpc.publicnode.com")
+    sepolia_rpc_url: str = os.getenv(
+        "SEPOLIA_RPC_URL", "https://ethereum-sepolia-rpc.publicnode.com"
+    )
     base_rpc_url: str = os.getenv("BASE_RPC_URL", "https://mainnet.base.org")
     optimism_rpc_url: str = os.getenv(
         "OPTIMISM_RPC_URL", "https://mainnet.optimism.io"
@@ -76,6 +80,7 @@ class Settings:
     # Server-side display prices in USD cents. Override from the deployment env
     # or replace with an oracle/price-feed adapter for production.
     usdt_usd_cents: int = int(os.getenv("USDT_USD_CENTS", "100"))
+    usdc_usd_cents: int = int(os.getenv("USDC_USD_CENTS", os.getenv("USDT_USD_CENTS", "100")))
     weth_usd_cents: int = int(os.getenv("WETH_USD_CENTS", "356097"))
     wbtc_usd_cents: int = int(os.getenv("WBTC_USD_CENTS", "6581833"))
     cors_origins: tuple[str, ...] = parse_csv(
@@ -95,6 +100,8 @@ EVM_RPC_URLS = {
     "ethereum": SETTINGS.eth_rpc_url,
     "eth": SETTINGS.eth_rpc_url,
     "mainnet": SETTINGS.eth_rpc_url,
+    "sepolia": SETTINGS.sepolia_rpc_url,
+    "eth-sepolia": SETTINGS.sepolia_rpc_url,
     "base": SETTINGS.base_rpc_url,
     "optimism": SETTINGS.optimism_rpc_url,
     "op": SETTINGS.optimism_rpc_url,
@@ -107,6 +114,8 @@ CHAIN_BLOCK_TIME_SECONDS = {
     "ethereum": 12.0,
     "eth": 12.0,
     "mainnet": 12.0,
+    "sepolia": 12.0,
+    "eth-sepolia": 12.0,
     "base": 2.0,
     "optimism": 2.0,
     "op": 2.0,

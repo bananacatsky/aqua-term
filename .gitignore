@@ -4,5 +4,9 @@
 /broadcast/
 .env
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
+venv/
 __pycache__/
 .pytest_cache/

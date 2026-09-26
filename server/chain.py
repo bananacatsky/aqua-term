@@ -291,6 +291,7 @@ class ChainReader:
 
         wallet_prices = {
             "USDT": SETTINGS.usdt_usd_cents,
+            "USDC": SETTINGS.usdc_usd_cents,
             "WETH": SETTINGS.weth_usd_cents,
             "WBTC": SETTINGS.wbtc_usd_cents,
         }
