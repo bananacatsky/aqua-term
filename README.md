@@ -18,13 +18,15 @@ AquaTerm uses Aqua virtual balances to keep orders non-custodial until execution
 
 Borrower collateral is shared across debts of different maturities under a single portfolio health factor. Maturity claims are transferable and can be traded on the secondary market before expiry.
 
+An unhealthy borrower can be liquidated against one maturity's debt and one collateral token. After maturity, outstanding debt can also be liquidated when the borrower is healthy. The liquidator receives collateral at the configured per-token liquidation discount, pays the debt token into that maturity vault, and may use a callback to exchange collateral and fund repayment atomically. If all of the borrower's collateral is exhausted, remaining performing debt across maturities is written down, while the borrower still owes it and later repayment restores vault value. The contracts and tests have not been audited.
+
 
 How it's made
 -------------
 
 AquaTerm is built around 1inch Aqua as its execution and liquidity layer. The core Solidity contract, AquaTermApp, uses Aqua virtual balances so borrowers and suppliers can post term orders without locking assets upfront. Their collateral and USDT remain available to other Aqua strategies while the orders are open, and real token transfers happen only when two compatible orders are matched.
 
-The most unusual part is how we handle fixed-maturity debt. Every maturity has its own ERC-4626 vault, such as USDT-OCT30 or USDT-JAN31. These derivative tokens are designed to redeem approximately 1:1 for USDT at maturity, assuming the underlying loans are fully repaid. Borrowers can advertise these maturity shares through Aqua before the shares actually exist. When a match executes, AquaTerm checks the borrower’s portfolio LTV, pulls only the additional collateral required, mints the maturity shares just in time, and immediately settles the trade through Aqua: the supplier’s USDT goes to the borrower, while the freshly minted maturity shares go to the supplier. This all happens atomically in a single transaction.
+The most unusual part is how we handle fixed-maturity debt. Every maturity has its own ERC-4626 vault, such as USDT-OCT30 or USDT-JAN31. These derivative tokens are designed to redeem approximately 1:1 for USDT at maturity, assuming the underlying loans are fully repaid. Borrowers can advertise these maturity shares through Aqua before the shares actually exist. When a match executes, AquaTerm checks the borrower's portfolio LTV, pulls only the additional collateral required, mints the maturity shares just in time, and immediately settles the trade through Aqua: the supplier's USDT goes to the borrower, while the freshly minted maturity shares go to the supplier. This all happens atomically in a single transaction.
 
 The derivative tokens are implemented as ERC-4626 vault shares so that, in the event of bad debt, losses can be socialized across the current holders of the maturity claims. The maturity vaults track both cash and outstanding loans in their NAV, allowing the maturity tokens to behave as transferable fixed-income claims that can be traded before expiry.
 
@@ -32,6 +34,16 @@ Risk is managed at the borrower portfolio level across multiple maturities and c
 
 We built a lightweight Python indexer using Flask, web3.py, and SQLite. It watches the AquaTerm contracts for borrower and supplier orders, reconstructs the live orderbook, and exposes it to the frontend.
 
-Matching is permissionless and incentivized: anyone can execute crossed orders, and the spread between the borrower’s minimum price and the supplier’s maximum price becomes the executor’s reward.
+Matching is permissionless and incentivized: anyone can execute crossed orders, and the spread between the borrower's minimum price and the supplier's maximum price becomes the executor's reward.
 
 The frontend is a lightweight static app built with vanilla JavaScript and ethers v6. It talks directly to the contracts for transactions and uses the indexer only for market discovery and orderbook data. The whole stack is intentionally simple and hackathon-friendly: Solidity and Foundry onchain, a small Python service for indexing, and a static frontend with no build pipeline.
+
+## Mock API and frontend
+
+For local frontend development, run the deterministic Python mock API:
+
+```bash
+python3 server/mock_app.py
+```
+
+It listens on `http://127.0.0.1:5002` and exposes the same read endpoints as the chain-backed API: `/api/health`, `/api/market`, `/api/portfolio`, `/api/orders` and `/api/orderbook`. The static frontend requests this API automatically. To use another API URL, define `window.AQUA_API_BASE` before loading `api.js`.

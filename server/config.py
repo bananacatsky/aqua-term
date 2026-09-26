@@ -73,6 +73,11 @@ class Settings:
     sync_block_chunk: int = int(os.getenv("SYNC_BLOCK_CHUNK", "2000"))
     sync_max_age_seconds: int = int(os.getenv("SYNC_MAX_AGE_SECONDS", str(30 * 24 * 3600)))
     refresh_open_orders: bool = env_bool("REFRESH_OPEN_ORDERS", True)
+    # Server-side display prices in USD cents. Override from the deployment env
+    # or replace with an oracle/price-feed adapter for production.
+    usdt_usd_cents: int = int(os.getenv("USDT_USD_CENTS", "100"))
+    weth_usd_cents: int = int(os.getenv("WETH_USD_CENTS", "356097"))
+    wbtc_usd_cents: int = int(os.getenv("WBTC_USD_CENTS", "6581833"))
     cors_origins: tuple[str, ...] = parse_csv(
         os.getenv(
             "CORS_ORIGINS",
