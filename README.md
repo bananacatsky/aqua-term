@@ -22,8 +22,16 @@ Borrower collateral is shared across debts of different maturities under a singl
 How it's made
 -------------
 
-The on-chain core is Solidity on Foundry: `AquaTermApp` extends 1inch Aqua’s `AquaApp`, settles matches with `Aqua.pull()`, and mints one OpenZeppelin ERC-4626 `AquaTermVault` per maturity. Chainlink feeds price collateral; bad-debt write-downs flow through a custom `totalAssets()` that tracks cash plus performing receivables minus losses. Tests deploy the real Aqua contract and exercise full `ship` → `matchOrders` → repay/redeem flows.
+AquaTerm is built around 1inch Aqua as its execution and liquidity layer. The core Solidity contract, AquaTermApp, uses Aqua virtual balances so borrowers and suppliers can post term orders without locking assets upfront. Their collateral and USDT remain available to other Aqua strategies while the orders are open, and real token transfers happen only when two compatible orders are matched.
 
-The hacky part is leaning on Aqua virtual balances: borrowers `ship` maturity shares that do not exist yet, suppliers `ship` spot USDT from wallet, and nothing moves until a permissionless matcher fills compatible orders — at which point collateral is pulled just-in-time, shares are minted, and both legs settle atomically. The matcher keeps any spread.
+The most unusual part is how we handle fixed-maturity debt. Every maturity has its own ERC-4626 vault, such as USDT-OCT30 or USDT-JAN31. These derivative tokens are designed to redeem approximately 1:1 for USDT at maturity, assuming the underlying loans are fully repaid. Borrowers can advertise these maturity shares through Aqua before the shares actually exist. When a match executes, AquaTerm checks the borrower’s portfolio LTV, pulls only the additional collateral required, mints the maturity shares just in time, and immediately settles the trade through Aqua: the supplier’s USDT goes to the borrower, while the freshly minted maturity shares go to the supplier. This all happens atomically in a single transaction.
 
-Off-chain, a Flask API indexes chain events into a DB and exposes an order book, portfolio views, and match suggestions. The frontend is static HTML/CSS/JS with ethers v6 for wallet connect, `create*Order`, `ship`, and `matchOrders`. No separate frontend build step — the demo is meant to plug into Aqua’s existing strategy UX.
+The derivative tokens are implemented as ERC-4626 vault shares so that, in the event of bad debt, losses can be socialized across the current holders of the maturity claims. The maturity vaults track both cash and outstanding loans in their NAV, allowing the maturity tokens to behave as transferable fixed-income claims that can be traded before expiry.
+
+Risk is managed at the borrower portfolio level across multiple maturities and collateral types, with Chainlink price feeds used for collateral valuation, LTV checks, and liquidations. The contracts have no owner or admin setters; protocol parameters are fixed at deployment.
+
+We built a lightweight Python indexer using Flask, web3.py, and SQLite. It watches the AquaTerm contracts for borrower and supplier orders, reconstructs the live orderbook, and exposes it to the frontend.
+
+Matching is permissionless and incentivized: anyone can execute crossed orders, and the spread between the borrower’s minimum price and the supplier’s maximum price becomes the executor’s reward.
+
+The frontend is a lightweight static app built with vanilla JavaScript and ethers v6. It talks directly to the contracts for transactions and uses the indexer only for market discovery and orderbook data. The whole stack is intentionally simple and hackathon-friendly: Solidity and Foundry onchain, a small Python service for indexing, and a static frontend with no build pipeline.
