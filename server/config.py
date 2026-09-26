@@ -28,6 +28,10 @@ class AppConfig:
     from_block: int
 
 
+def parse_csv(raw: str) -> tuple[str, ...]:
+    return tuple(x.strip() for x in raw.split(",") if x.strip())
+
+
 def parse_apps(raw: str) -> tuple[AppConfig, ...]:
     apps: list[AppConfig] = []
     for item in raw.split(","):
@@ -62,6 +66,12 @@ class Settings:
     sync_block_chunk: int = int(os.getenv("SYNC_BLOCK_CHUNK", "2000"))
     sync_max_age_seconds: int = int(os.getenv("SYNC_MAX_AGE_SECONDS", str(30 * 24 * 3600)))
     refresh_open_orders: bool = env_bool("REFRESH_OPEN_ORDERS", True)
+    cors_origins: tuple[str, ...] = parse_csv(
+        os.getenv(
+            "CORS_ORIGINS",
+            "https://bananacatsky.github.io",
+        )
+    )
     aquaterm_apps: tuple[AppConfig, ...] = (
         parse_apps(os.getenv("AQUATERM_APPS", "")) if os.getenv("AQUATERM_APPS") else ()
     )

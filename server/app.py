@@ -18,8 +18,15 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 
+
+def _cors_origins() -> list[str] | str:
+    if len(SETTINGS.cors_origins) == 1 and SETTINGS.cors_origins[0] == "*":
+        return "*"
+    return list(SETTINGS.cors_origins)
+
+
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app, resources={r"/api/*": {"origins": _cors_origins()}})
 
 database = Database(SETTINGS.orderbook_db)
 syncer = ChainSyncer(database)
