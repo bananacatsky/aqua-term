@@ -77,6 +77,7 @@ function buildAquaEnv(env) {
     contracts: {
       [chain]: {
         app,
+        aqua: (env.AQUA_ADDRESS || '0x1111113CCf1426A8E30e2bfF5E005d929bF6a90a').toLowerCase(),
         debtToken: (env.AQUA_DEBT_TOKEN || usdt).toLowerCase(),
         tokens: { usdt, weth, wbtc },
       },

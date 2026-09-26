@@ -57,7 +57,7 @@ const AquaApi={
     const createOrder=document.getElementById('create-order');
     if(createOrder) createOrder.classList.remove('wallet-disconnected');
     this.renderPortfolio(portfolio);
-    orderbooks.forEach(item=>this.renderOrderbook(item,true));
+    await Promise.all(orderbooks.map(item=>this.renderOrderbook(item,true)));
     this.renderOpenOrders(orders);
     const status=document.getElementById('api-status');
     if(status){status.textContent='API: connected';status.className='api-status online'}
@@ -72,7 +72,7 @@ const AquaApi={
     if(requestId!==this.requestId) return null;
     this.market=market;
     this.renderMarket(market);
-    orderbooks.forEach(item=>this.renderOrderbook(item));
+    await Promise.all(orderbooks.map(item=>this.renderOrderbook(item)));
     const status=document.getElementById('api-status');
     if(status){status.textContent='API: public data';status.className='api-status online'}
     return {market,orderbooks};
@@ -269,9 +269,15 @@ const AquaApi={
     this.updateDepositBalance();
 
     const debts=document.getElementById('debts-list');
-    if(debts) debts.innerHTML=data.debts.length?data.debts.map(item=>`<div class="position-row"><div><div class="num">Debt · ${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${this.formatDebt(item.face_debt)}</div><div class="muted">Outstanding</div></div><div><div class="num">${this.formatDebt(item.written_down)}</div><div class="muted">Written down</div></div><button class="btn btn-primary">Repay</button></div>`).join(''):'<div class="muted">No active debts.</div>';
+    if(debts) debts.innerHTML=data.debts.length?data.debts.map(item=>`<div class="position-row"><div><div class="num">Debt · ${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${this.formatDebt(item.face_debt)}</div><div class="muted">Outstanding</div></div><div><div class="num">${this.formatDebt(item.written_down)}</div><div class="muted">Written down</div></div><button class="btn btn-primary" type="button" data-repay-maturity="${item.maturity}" data-repay-amount="${item.face_debt}">Repay</button></div>`).join(''):'<div class="muted">No active debts.</div>';
     const lending=document.getElementById('lending-list');
-    if(lending) lending.innerHTML=data.lending.length?data.lending.map(item=>`<div class="position-row"><div><div class="num">${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${this.formatDebt(item.assets)}</div><div class="muted">Lent now</div></div><div><div class="num">${this.formatDebt(item.redeemable_assets)}</div><div class="muted">Redeemable now</div></div><button class="btn btn-primary">Redeem</button></div>`).join(''):'<div class="muted">No lending positions.</div>';
+    if(lending) lending.innerHTML=data.lending.length?data.lending.map(item=>{
+      const canRedeem=!this.isZeroAmount(item.redeemable_shares);
+      const redeemBtn=canRedeem
+        ? `<button class="btn btn-primary" type="button" data-redeem-vault="${item.vault}" data-redeem-shares="${item.redeemable_shares}">Redeem</button>`
+        : `<button class="btn btn-secondary" type="button" disabled title="Redeemable after maturity when the vault has cash">Redeem</button>`;
+      return `<div class="position-row"><div><div class="num">${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${this.formatDebt(item.assets)}</div><div class="muted">Lent now</div></div><div><div class="num">${this.formatDebt(item.redeemable_assets)}</div><div class="muted">Redeemable now</div></div>${redeemBtn}</div>`;
+    }).join(''):'<div class="muted">No lending positions.</div>';
     const collateralList=document.getElementById('collateral-list');
     if(collateralList) collateralList.innerHTML=data.collateral.length?data.collateral.map(item=>`<div class="token-row"><div class="token"><div class="coin">${item.token.symbol}</div><div><div class="num">${this.formatTokenAmount(item.amount,item.token.decimals,item.token.symbol)}</div><div class="muted">Deposited</div></div></div><div><div class="num">${this.formatUsdFromDebt(data.risk.collateral_value)}</div><div class="muted">Portfolio value</div></div></div>`).join(''):'<div class="muted">No collateral deposited.</div>';
     const walletList=document.getElementById('wallet-list');
@@ -304,7 +310,7 @@ const AquaApi={
   selectedCollateral(selectId='deposit-token-select'){
     const select=document.getElementById(selectId);
     const id=Number(select?.value);
-    return this.market?.collaterals?.find(item=>item.id===id)||null;
+    return this.market?.collaterals?.find(item=>Number(item.id)===id)||null;
   },
 
   updateDepositBalance(){
@@ -322,14 +328,89 @@ const AquaApi={
     const openOrders=document.getElementById('open-orders-list');
     if(!openOrders) return;
     const rows=[
-      ...(data.borrow?.items||[]).map(item=>`<div class="order-row"><div><div class="num">Borrow · ${this.maturityLabel(item.maturity)}</div><div class="muted">Open order</div></div><div class="num">${this.formatDebt(item.remaining_face||item.face_amount)}</div><span class="pill orange">Open</span></div>`),
-      ...(data.supply?.items||[]).map(item=>`<div class="order-row"><div><div class="num">Lend · ${this.maturityLabel(item.maturity)}</div><div class="muted">Open order</div></div><div class="num">${this.formatDebt(item.remaining_debt_token||item.debt_token_in)}</div><span class="pill orange">Open</span></div>`),
+      ...(data.borrow?.items||[]).map(item=>`<div class="order-row"><div><div class="num">Borrow · ${this.maturityLabel(item.maturity)}</div><div class="muted">Open order</div></div><div class="num">${this.formatDebt(item.remaining_face||item.face_amount)}</div><span class="pill orange">Open</span><button class="btn btn-danger-soft" type="button" data-cancel-order="borrow" data-order-id="${item.order_id}">Cancel</button></div>`),
+      ...(data.supply?.items||[]).map(item=>`<div class="order-row"><div><div class="num">Lend · ${this.maturityLabel(item.maturity)}</div><div class="muted">Open order</div></div><div class="num">${this.formatDebt(item.remaining_debt_token||item.debt_token_in)}</div><span class="pill orange">Open</span><button class="btn btn-danger-soft" type="button" data-cancel-order="supply" data-order-id="${item.order_id}">Cancel</button></div>`),
     ];
     openOrders.innerHTML=rows.length?rows.join(''):'<div class="muted">No open orders.</div>';
     this.setSectionHidden('my-open-orders', !rows.length);
   },
 
-  renderOrderbook(data,showMatch=false){
+  toBig(value){
+    try{ return BigInt(value||0); }
+    catch{ return 0n; }
+  },
+
+  ceilDiv(num,den){
+    if(den===0n) return 0n;
+    return (num+den-1n)/den;
+  },
+
+  vaultForMaturity(maturity){
+    return this.market?.maturities?.find(item=>Number(item.timestamp)===Number(maturity))?.vault||null;
+  },
+
+  async previewDebtShares(maturity,faceAmount){
+    const vault=this.vaultForMaturity(maturity);
+    if(!vault || !window.AquaWeb3) return this.toBig(faceAmount);
+    try{
+      return this.toBig(await AquaWeb3.readContract({
+        address:vault,
+        abi:AquaConfig.AquaABIs.vault,
+        functionName:'previewDebtShares',
+        args:[faceAmount],
+      }));
+    }catch{
+      return this.toBig(faceAmount);
+    }
+  },
+
+  async findCompatibleMatch(data){
+    const buys=data.buy?.items||[];
+    const sells=data.sell?.items||[];
+    let best=null;
+    for(const borrow of sells){
+      for(const supply of buys){
+        const face=this.toBig(borrow.face_amount);
+        const minOut=this.toBig(borrow.min_debt_token_out);
+        let fillFace=this.toBig(borrow.remaining_face||borrow.face_amount);
+        const debtIn=this.toBig(supply.debt_token_in);
+        const minTerm=this.toBig(supply.min_term_out);
+        const remainingDebt=this.toBig(supply.remaining_debt_token||supply.debt_token_in);
+        if(face===0n || minOut===0n || fillFace===0n || debtIn===0n || minTerm===0n || remainingDebt===0n) continue;
+        let borrowerMin=this.ceilDiv(minOut*fillFace,face);
+        if(borrowerMin>remainingDebt){
+          fillFace=(remainingDebt*face)/minOut;
+          while(fillFace>0n && this.ceilDiv(minOut*fillFace,face)>remainingDebt) fillFace-=1n;
+          borrowerMin=fillFace>0n?this.ceilDiv(minOut*fillFace,face):0n;
+        }
+        if(fillFace===0n || borrowerMin===0n) continue;
+        const shares=await this.previewDebtShares(data.maturity,fillFace);
+        let fillDebt=remainingDebt;
+        let supplierShares=this.ceilDiv(minTerm*fillDebt,debtIn);
+        if(shares<supplierShares){
+          fillDebt=borrowerMin;
+          supplierShares=this.ceilDiv(minTerm*fillDebt,debtIn);
+        }
+        if(fillDebt<borrowerMin || shares<supplierShares) continue;
+        const score=fillFace+fillDebt;
+        if(!best || score>best.score){
+          best={
+            borrowOrderId:borrow.order_id,
+            supplyOrderId:supply.order_id,
+            faceAmount:fillFace,
+            debtTokenAmount:fillDebt,
+            borrowerMin,
+            supplierShares,
+            shares,
+            score,
+          };
+        }
+      }
+    }
+    return best;
+  },
+
+  async renderOrderbook(data,showMatch=false){
     const target=document.querySelector(`[data-panel="${data.maturity}"]`);
     if(!target) return;
     const buy=data.buy?.items||[];
@@ -345,8 +426,18 @@ const AquaApi={
       const rate=Number(now)>0?((Number(later)/Number(now)-1)*100).toFixed(1):'—';
       return `<div class="ladder-row ${type==='lender'?'lender':'borrower'}"><div><span class="side-badge"><span class="side-dot"></span>${type==='lender'?'Lend':'Borrow'}</span><span class="muted">${type==='lender'?'Lend now':'Get now'}</span><br><b>${amount(now)}</b></div><div class="flow-arrow">${type==='lender'?'→':'←'}</div><div><span class="muted">${type==='lender'?'Receive later':'Repay later'}</span><br><b>${amount(later)}</b></div><div class="rate">${rate}%</div></div>`;
     };
-    const match=showMatch?'<div class="match-zone"><div class="match-title">Match available</div><div class="reward">Available to execute</div><button class="btn btn-primary" style="margin-top:9px;width:100%">Match!</button></div>':'';
-    target.innerHTML=buy.map(item=>row(item,'lender')).join('')+match+sell.map(item=>row(item,'borrower')).join('');
+    const match=showMatch?await this.findCompatibleMatch(data):null;
+    let matchHtml='';
+    if(match){
+      const rewardParts=[];
+      const extraDebt=match.debtTokenAmount-match.borrowerMin;
+      const extraShares=match.shares-match.supplierShares;
+      if(extraDebt>0n) rewardParts.push(this.formatDebt(extraDebt.toString()));
+      if(extraShares>0n) rewardParts.push(`${this.formatDebt(extraShares.toString())} shares`);
+      const reward=rewardParts.length?`Reward: ${rewardParts.join(' + ')}`:'Available to execute';
+      matchHtml=`<div class="match-zone"><div class="match-title">Match available</div><div class="reward">${reward}</div><button class="btn btn-primary" type="button" style="margin-top:9px;width:100%" data-match-borrow="${match.borrowOrderId}" data-match-supply="${match.supplyOrderId}" data-match-face="${match.faceAmount}" data-match-debt="${match.debtTokenAmount}">Match!</button></div>`;
+    }
+    target.innerHTML=buy.map(item=>row(item,'lender')).join('')+matchHtml+sell.map(item=>row(item,'borrower')).join('');
   },
 };
 window.AquaApi=AquaApi;

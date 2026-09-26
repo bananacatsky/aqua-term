@@ -3,6 +3,7 @@
  * Deployment-specific values come from env-config.js (see scripts/gen_frontend_config.py).
  */
 const ZERO_ADDRESS='0x0000000000000000000000000000000000000000';
+const AQUA_REGISTRY='0x1111113CCf1426A8E30e2bfF5E005d929bF6a90a';
 
 const AquaChains={
   ethereum:{
@@ -63,28 +64,23 @@ let AQUA_CHAIN='ethereum';
 
 const AquaContracts={
   ethereum:{
-    app:ZERO_ADDRESS,
-    debtToken:ZERO_ADDRESS,
+    app:ZERO_ADDRESS, aqua:AQUA_REGISTRY, debtToken:ZERO_ADDRESS,
     tokens:{usdt:ZERO_ADDRESS,weth:ZERO_ADDRESS,wbtc:ZERO_ADDRESS},
   },
   sepolia:{
-    app:ZERO_ADDRESS,
-    debtToken:ZERO_ADDRESS,
+    app:ZERO_ADDRESS, aqua:AQUA_REGISTRY, debtToken:ZERO_ADDRESS,
     tokens:{usdt:ZERO_ADDRESS,weth:ZERO_ADDRESS,wbtc:ZERO_ADDRESS},
   },
   base:{
-    app:ZERO_ADDRESS,
-    debtToken:ZERO_ADDRESS,
+    app:ZERO_ADDRESS, aqua:AQUA_REGISTRY, debtToken:ZERO_ADDRESS,
     tokens:{usdt:ZERO_ADDRESS,weth:ZERO_ADDRESS,wbtc:ZERO_ADDRESS},
   },
   optimism:{
-    app:ZERO_ADDRESS,
-    debtToken:ZERO_ADDRESS,
+    app:ZERO_ADDRESS, aqua:AQUA_REGISTRY, debtToken:ZERO_ADDRESS,
     tokens:{usdt:ZERO_ADDRESS,weth:ZERO_ADDRESS,wbtc:ZERO_ADDRESS},
   },
   arbitrum:{
-    app:ZERO_ADDRESS,
-    debtToken:ZERO_ADDRESS,
+    app:ZERO_ADDRESS, aqua:AQUA_REGISTRY, debtToken:ZERO_ADDRESS,
     tokens:{usdt:ZERO_ADDRESS,weth:ZERO_ADDRESS,wbtc:ZERO_ADDRESS},
   },
 };
@@ -119,8 +115,16 @@ const AquaABIs={
     'function cancelSupplyOrder(uint256 id)',
     'function matchOrders(uint256 borrowOrderId,uint256 supplyOrderId,uint256 faceAmount,uint256 debtTokenAmount)',
     'function repay(uint40 maturity,uint256 amount)',
+    'function vaultForMaturity(uint40) view returns (address)',
+    'function borrowStrategyBytes(uint256 id) view returns (bytes)',
+    'function supplyStrategyBytes(uint256 id) view returns (bytes)',
     'function borrowOrders(uint256) view returns (address borrower,uint40 maturity,uint40 deadline,uint128 faceAmount,uint128 minDebtTokenOut,uint16 ltvBps,uint256 collateralId,uint128 filledFace,bool cancelled)',
     'function supplyOrders(uint256) view returns (address supplier,uint40 maturity,uint40 deadline,uint128 debtTokenIn,uint128 minTermOut,uint128 filledDebtToken,bool cancelled)',
+    'event BorrowOrderCreated(uint256 indexed orderId,address indexed borrower,uint40 maturity,uint40 deadline,uint256 faceAmount,uint256 minDebtTokenOut,uint256 ltvBps,uint256 collateralId)',
+    'event SupplyOrderCreated(uint256 indexed orderId,address indexed supplier,uint40 maturity,uint40 deadline,uint256 debtTokenIn,uint256 minTermOut)',
+  ],
+  aqua:[
+    'function ship(address app,bytes strategy,address[] tokens,uint256[] amounts) returns (bytes32 strategyHash)',
   ],
   erc20:[
     'function name() view returns (string)',
@@ -135,6 +139,7 @@ const AquaABIs={
     'function totalAssets() view returns (uint256)',
     'function balanceOf(address) view returns (uint256)',
     'function previewDebtShares(uint256 faceAmount) view returns (uint256)',
+    'function maxRedeem(address owner) view returns (uint256)',
     'function redeem(uint256 shares,address receiver,address owner) returns (uint256 assets)',
   ],
 };
@@ -159,4 +164,4 @@ const AquaABIs={
   }
 })();
 
-window.AquaConfig={ZERO_ADDRESS,AquaChains,AquaChainNames,chainLabel,get AQUA_CHAIN(){return AQUA_CHAIN},AquaContracts,AquaTokens,AquaMaturities,AquaABIs};
+window.AquaConfig={ZERO_ADDRESS,AQUA_REGISTRY,AquaChains,AquaChainNames,chainLabel,get AQUA_CHAIN(){return AQUA_CHAIN},AquaContracts,AquaTokens,AquaMaturities,AquaABIs};

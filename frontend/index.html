@@ -13,11 +13,11 @@
 .nav button{border:0;background:transparent;padding:9px 14px;border-radius:10px;color:#555;font-size:14px;font-weight:700;cursor:pointer;font:inherit}.nav button.active{background:#fff;color:#111;box-shadow:0 2px 8px rgba(0,0,0,.06)}
 @media(max-width:900px){.nav{display:none}}
 
-.btn-danger-soft{background:#fff;border:1px solid #e2e4e8;color:#6b6f76;padding:9px 12px}.btn-danger-soft:hover{border-color:#d0d3d8;background:#f7f8f9;color:#222}.order-deadline{font-size:11px;color:var(--muted);margin-top:3px}
+.btn-danger-soft{background:#fff;border:1px solid #e2e4e8;color:#6b6f76;padding:9px 12px}.btn-danger-soft:hover{border-color:#d0d3d8;background:#f7f8f9;color:#222}.order-deadline{font-size:11px;color:var(--muted);margin-top:3px}.order-row{grid-template-columns:1.4fr 1fr auto auto}
 .maturity-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 auto 14px;max-width:590px}.maturity-tab{border:1px solid var(--line);background:#fff;color:#666;border-radius:12px;padding:9px 13px;font-weight:850;cursor:pointer}.maturity-tab.active{background:#111;color:#fff;border-color:#111}.ladder{overflow:hidden;max-width:590px;margin:0 auto}.ladder-head,.ladder-row{display:grid;grid-template-columns:148px 24px 164px 54px;column-gap:6px;align-items:center;padding:9px 11px}.ladder-head{background:#fbfbfc;border-bottom:1px solid var(--line);font-size:10px;text-transform:uppercase;letter-spacing:.045em;color:var(--muted);font-weight:800}.ladder-head .rate-head{text-align:right}.ladder-row{border-bottom:1px solid var(--line);min-height:54px}.ladder-row.lender{background:#fff7ee}.ladder-row.borrower{background:#edfafa}.ladder-row .rate{font-size:12px;font-weight:800;letter-spacing:-.01em;text-align:right;color:#777}.ladder-row b{font-size:14px;letter-spacing:-.015em}.ladder-row .muted{font-size:10px;line-height:1}.flow-arrow{text-align:center;font-size:16px;font-weight:900;color:#9a9a9a}.side-badge{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;margin-right:6px}.side-dot{width:6px;height:6px;border-radius:50%}.lender .side-dot{background:#ff9a3d}.borrower .side-dot{background:#19c7b0}.match-zone{width:320px;max-width:calc(100% - 24px);margin:10px auto;padding:12px 14px;background:linear-gradient(180deg,#fff,#f7fbfa);border:1px solid var(--line);border-radius:14px;text-align:center}.match-title{font-size:16px;font-weight:900}.reward{margin-top:3px;font-size:12px;color:var(--muted)}.reward strong{display:inline;color:var(--text);font-size:12px;letter-spacing:0;margin:0 0 0 4px}.month-panel{display:none}.month-panel.active{display:block}.empty-month{padding:34px;text-align:center;color:var(--muted)}
 @media(max-width:800px){.ladder{max-width:100%}.maturity-tabs{max-width:100%}.ladder-head{display:none}.ladder-row{grid-template-columns:minmax(118px,1fr) 22px minmax(132px,1fr) 48px;column-gap:5px;padding:9px 9px}.ladder-row .rate{font-size:11px}.flow-arrow{font-size:15px}}
 </style>
-<style>.api-status{font-size:12px;color:var(--muted);white-space:nowrap}.api-status.online{color:var(--green)}.api-status.offline{color:var(--red)}.connect-message{display:none;min-height:calc(100vh - 140px);align-items:center;justify-content:center;text-align:center}.connect-wallet-large{min-width:260px;padding:18px 32px;font-size:18px;background:var(--orange);color:#fff}.riskbar span{width:0}.form-note[role=alert]{color:var(--red);background:#fff1f1;border:1px solid #ffd4d4;border-radius:10px;padding:10px 12px}#portfolio.wallet-disconnected>.page-head,#portfolio.wallet-disconnected>.grid,#portfolio.wallet-disconnected>.card,#create-order.wallet-disconnected>.page-head,#create-order.wallet-disconnected>.form-shell{display:none!important}#portfolio.wallet-disconnected>.connect-message,#create-order.wallet-disconnected>.connect-message{display:flex!important}.input-with-unit{position:relative}.input-with-unit .input{padding-right:68px}.input-with-unit .input-unit{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:800;color:var(--muted);pointer-events:none}.deadline-toggle{display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;font-weight:800;cursor:pointer;user-select:none}.deadline-toggle input{width:16px;height:16px;accent-color:var(--orange)}#order-deadline-field[hidden]{display:none}.aqua-modal-overlay{position:fixed;inset:0;z-index:90;background:rgba(15,18,20,.42);display:grid;place-items:center;padding:20px}.aqua-modal-overlay[hidden]{display:none}.aqua-modal{width:min(460px,100%);padding:26px;border-radius:18px;background:#fff;box-shadow:0 20px 70px rgba(0,0,0,.22)}.aqua-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.aqua-modal-head h3{margin:0;font-size:20px;letter-spacing:-.03em}.aqua-modal-close{border:0;background:#f1f2f4;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}.aqua-modal .field:first-of-type{margin-top:14px}.aqua-modal .split-actions{margin-top:18px}.aqua-modal .split-actions .btn{flex:1}</style>
+<style>.api-status{font-size:12px;color:var(--muted);white-space:nowrap}.api-status.online{color:var(--green)}.api-status.offline{color:var(--red)}.connect-message{display:none;min-height:calc(100vh - 140px);align-items:center;justify-content:center;text-align:center}.connect-wallet-large{min-width:260px;padding:18px 32px;font-size:18px;background:var(--orange);color:#fff}.wallet-btn:disabled,.connect-wallet-large:disabled{opacity:.72;cursor:wait}.connect-status{margin-top:14px;font-size:14px;font-weight:700;color:var(--muted)}.connect-status[hidden]{display:none}.riskbar span{width:0}.form-note[role=alert]{color:var(--red);background:#fff1f1;border:1px solid #ffd4d4;border-radius:10px;padding:10px 12px}#portfolio.wallet-disconnected>.page-head,#portfolio.wallet-disconnected>.grid,#portfolio.wallet-disconnected>.card,#create-order.wallet-disconnected>.page-head,#create-order.wallet-disconnected>.form-shell{display:none!important}#portfolio.wallet-disconnected>.connect-message,#create-order.wallet-disconnected>.connect-message{display:flex!important}.input-with-unit{position:relative}.input-with-unit .input{padding-right:68px}.input-with-unit .input-unit{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:800;color:var(--muted);pointer-events:none}.deadline-toggle{display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;font-weight:800;cursor:pointer;user-select:none}.deadline-toggle input{width:16px;height:16px;accent-color:var(--orange)}#order-deadline-field[hidden]{display:none}.aqua-modal-overlay{position:fixed;inset:0;z-index:90;background:rgba(15,18,20,.42);display:grid;place-items:center;padding:20px}.aqua-modal-overlay[hidden]{display:none}.aqua-modal{width:min(460px,100%);padding:26px;border-radius:18px;background:#fff;box-shadow:0 20px 70px rgba(0,0,0,.22)}.aqua-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.aqua-modal-head h3{margin:0;font-size:20px;letter-spacing:-.03em}.aqua-modal-close{border:0;background:#f1f2f4;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}.aqua-modal .field:first-of-type{margin-top:14px}.aqua-modal .split-actions{margin-top:18px}.aqua-modal .split-actions .btn{flex:1}</style>
 </head>
 <body>
 <div class="app">
@@ -30,7 +30,7 @@
   </nav>
   <div class="wallet"><span id="wallet-network" class="network">Ethereum</span><span id="api-status" class="api-status">API: connecting…</span><button id="connect-wallet" class="wallet-btn" type="button">Connect wallet</button><button id="disconnect-wallet" class="wallet-btn" type="button" style="display:none">Disconnect</button></div>
 </header>
-<section id="portfolio" class="page"><div class="page-head"><div><div class="eyebrow">Portfolio</div><h1>Your portfolio</h1><div class="sub">Your wallet, borrowing risk, debts, lending positions and collateral in one place.</div></div><div class="split-actions"><button id="open-withdraw-collateral" class="btn btn-secondary" type="button">Withdraw collateral</button><button id="open-deposit-collateral" class="btn btn-primary" type="button">Deposit collateral</button></div></div><div id="portfolio-connect-message" class="connect-message"><button id="portfolio-connect-button" class="btn btn-primary connect-wallet-large" type="button">Connect wallet</button></div>
+<section id="portfolio" class="page"><div class="page-head"><div><div class="eyebrow">Portfolio</div><h1>Your portfolio</h1><div class="sub">Your wallet, borrowing risk, debts, lending positions and collateral in one place.</div></div><div class="split-actions"><button id="open-withdraw-collateral" class="btn btn-secondary" type="button">Withdraw collateral</button><button id="open-deposit-collateral" class="btn btn-primary" type="button">Deposit collateral</button></div></div><div id="portfolio-connect-message" class="connect-message"><div><button id="portfolio-connect-button" class="btn btn-primary connect-wallet-large" type="button">Connect wallet</button><div class="connect-status" data-connect-status hidden></div></div></div>
 <section class="grid grid-4"><div class="card metric"><div class="label">Wallet balance</div><div id="wallet-balance-value" class="value"></div><div id="wallet-balance-hint" class="hint">Debt + collateral</div></div><div class="card metric"><div class="label">Total debt</div><div id="debt-value" class="value"></div><div class="hint">Across active debts</div></div><div class="card metric"><div class="label">Collateral</div><div id="collateral-value" class="value"></div><div class="hint">Deposited in AquaTerm</div></div><div class="card metric orange-card"><div class="label">Health factor</div><div id="health-factor-value" class="value"></div><div class="hint"><span id="health-status-pill" class="pill"></span></div></div></section>
 <section id="borrowing-health" class="card section"><div class="section-head"><h2>Borrowing health</h2><span id="health-status-section" class="pill"></span></div><div class="section-body"><div class="grid grid-4"><div class="metric" style="padding:0"><div class="label">Current LTV</div><div id="current-ltv-value" class="value"></div></div><div class="metric" style="padding:0"><div class="label">Borrow limit</div><div id="borrow-limit-value" class="value"></div></div><div class="metric" style="padding:0"><div class="label">Liquidation limit</div><div id="liquidation-limit-value" class="value"></div></div><div class="metric" style="padding:0"><div class="label">Health factor</div><div id="health-factor-risk-value" class="value"></div></div></div><div class="riskbar"><span id="riskbar-value"></span></div><div id="health-description" class="muted"></div></div></section>
 <section id="my-debts" class="card section"><div class="section-head"><h2>My debts</h2><button class="btn btn-secondary" data-route="create-order">Create borrow order</button></div><div id="debts-list" class="section-body"></div></section>
@@ -47,13 +47,13 @@
 <div class="month-panel" data-panel="jan"></div>
 </div>
 <div class="form-note" style="margin-top:18px">Execution model A: borrower pays up to their maximum rate, lender receives their minimum rate, and the matcher receives the full available spread as the execution reward. The matcher also pays gas.</div></section>
-<section id="create-order" class="page"><div class="page-head"><div><div class="eyebrow">Create order</div><h1>Set your terms</h1><div class="sub">Choose whether you want to borrow or lend, then set the two amounts that matter most.</div></div></div><div id="create-order-connect-message" class="connect-message"><button id="create-order-connect-button" class="btn btn-primary connect-wallet-large" type="button">Connect wallet</button></div><section class="form-shell"><div class="card form-card"><div class="segmented"><button type="button" class="seg active" data-order-type="borrow">Borrow</button><button type="button" class="seg" data-order-type="lend">Lend</button></div>
+<section id="create-order" class="page"><div class="page-head"><div><div class="eyebrow">Create order</div><h1>Set your terms</h1><div class="sub">Choose whether you want to borrow or lend, then set the two amounts that matter most.</div></div></div><div id="create-order-connect-message" class="connect-message"><div><button id="create-order-connect-button" class="btn btn-primary connect-wallet-large" type="button">Connect wallet</button><div class="connect-status" data-connect-status hidden></div></div></div><section class="form-shell"><div class="card form-card"><div class="segmented"><button type="button" class="seg active" data-order-type="borrow">Borrow</button><button type="button" class="seg" data-order-type="lend">Lend</button></div>
 <div class="field"><label>Maturity</label><select class="select" id="maturity-select"></select></div>
 <label class="deadline-toggle"><input id="show-deadline" type="checkbox"> Show deadline</label>
 <div class="field" id="order-deadline-field" hidden><label>Order deadline <span class="muted">(must fill by)</span></label><input class="input" id="order-deadline" type="datetime-local" value=""></div>
 <div id="borrow-fields"><div class="field"><label>Receive now <span class="muted">(minimum)</span></label><div class="input-with-unit"><input class="input" id="borrow-receive" value=""><span class="input-unit" data-debt-symbol></span></div></div><div class="field"><label>Repay later</label><div class="input-with-unit"><input class="input" id="borrow-repay" value=""><span class="input-unit" data-debt-symbol></span></div></div><div class="field-row"><div class="field"><label>Maximum LTV <span class="muted">(limit)</span></label><div class="input-with-unit"><input class="input" id="max-ltv" value="50"><span class="input-unit">%</span></div></div><div class="field"><label>Collateral if needed</label><select class="select" id="order-collateral-select"></select></div></div><div class="form-note">If more collateral is needed when the order is matched, AquaTerm calculates the required top-up automatically.</div></div>
 <div id="lend-fields" style="display:none"><div class="field"><label>Lend now</label><div class="input-with-unit"><input class="input" id="lend-now" value=""><span class="input-unit" data-debt-symbol></span></div></div><div class="field"><label>Receive at maturity <span class="muted">(minimum)</span></label><div class="input-with-unit"><input class="input" id="lend-receive" value=""><span class="input-unit" data-debt-symbol></span></div></div><div id="lend-wallet-note" class="form-note">Your debt token stays in your wallet until a compatible borrower is matched.</div></div>
-<div class="field"><button id="create-order-btn" class="btn btn-primary" style="width:100%;padding:14px">Create borrow order</button></div><div class="footer-note">The order can be matched only until its deadline. You can cancel any unfilled remainder from Portfolio.</div></div>
+<div class="field"><button id="create-order-btn" class="btn btn-primary" style="width:100%;padding:14px">Create borrow order</button></div><div id="create-order-error" class="form-note" role="alert" hidden></div><div class="footer-note">The order can be matched only until its deadline. You can cancel any unfilled remainder from Portfolio.</div></div>
 <aside class="card summary"><div class="eyebrow">Preview</div><div id="borrow-preview"><h3>Borrow order</h3><div class="summary-total"><div class="muted">Receive at least now</div><div class="big" id="borrow-preview-now"></div></div><div class="summary-total"><div class="muted">Repay at maturity</div><div class="big" id="borrow-preview-maturity"></div></div><div class="summary-row"><span class="muted">Maturity</span><strong id="borrow-preview-date"></strong></div><div class="summary-row"><span class="muted">Order expires</span><strong id="borrow-preview-deadline"></strong></div><div class="summary-row"><span class="muted">Difference</span><strong id="borrow-preview-diff"></strong></div><div class="summary-row"><span class="muted">Rate</span><strong id="borrow-preview-rate"></strong></div><div class="footer-note">Collateral and risk limits are checked when the order is matched.</div></div><div id="lend-preview" style="display:none"><h3>Lending order</h3><div class="summary-total"><div class="muted">Lend now</div><div class="big" id="lend-preview-now"></div></div><div class="summary-total"><div class="muted">Receive at least at maturity</div><div class="big" id="lend-preview-maturity"></div></div><div class="summary-row"><span class="muted">Maturity</span><strong id="lend-preview-date"></strong></div><div class="summary-row"><span class="muted">Order expires</span><strong id="lend-preview-deadline"></strong></div><div class="summary-row"><span class="muted">Minimum gain</span><strong id="lend-preview-diff"></strong></div><div class="summary-row"><span class="muted">Rate</span><strong id="lend-preview-rate"></strong></div><div class="footer-note">Your order will wait until a compatible borrower is matched or the deadline passes.</div></div></aside></section></section></div>
 <div id="deposit-collateral-modal" class="aqua-modal-overlay" hidden>
   <div class="aqua-modal" role="dialog" aria-modal="true" aria-labelledby="deposit-modal-title">
@@ -83,6 +83,7 @@
 let walletProvider;
 let walletSigner;
 let walletAddress;
+let walletConnectInFlight=false;
 
 const connectButton=document.getElementById('connect-wallet');
 const disconnectButton=document.getElementById('disconnect-wallet');
@@ -94,12 +95,53 @@ function shortAddress(address){
   return `${address.slice(0,6)}…${address.slice(-4)}`;
 }
 
+function setConnectStatus(text){
+  document.querySelectorAll('[data-connect-status]').forEach(el=>{
+    el.textContent=text||'';
+    el.hidden=!text;
+  });
+}
+
+function setLargeConnectButtons(label, disabled){
+  [portfolioConnectButton,createOrderConnectButton].forEach(btn=>{
+    if(!btn) return;
+    btn.textContent=label;
+    btn.disabled=!!disabled;
+  });
+}
+
+function resetConnectButtons(){
+  connectButton.disabled=false;
+  if(walletAddress){
+    connectButton.textContent=shortAddress(walletAddress);
+    connectButton.title=walletAddress;
+  }else{
+    connectButton.textContent='Connect wallet';
+    connectButton.title='';
+  }
+  setLargeConnectButtons('Connect wallet', false);
+  setConnectStatus('');
+}
+
+function showConnectProgress(label, status){
+  if(!walletAddress){
+    connectButton.textContent=label;
+    connectButton.disabled=true;
+  }
+  setLargeConnectButtons(label, true);
+  setConnectStatus(status);
+}
+
 async function connectWallet(){
+  if(walletConnectInFlight) return;
   if(!window.ethereum){
     connectButton.textContent='Install MetaMask';
     window.open('https://metamask.io/download/', '_blank', 'noopener');
     return;
   }
+
+  walletConnectInFlight=true;
+  showConnectProgress('Connecting…', 'Confirm the connection in your wallet…');
 
   try{
     walletProvider=new ethers.BrowserProvider(window.ethereum);
@@ -112,16 +154,24 @@ async function connectWallet(){
 
     connectButton.textContent=shortAddress(walletAddress);
     connectButton.title=walletAddress;
-    AquaApi.loadForAddress(walletAddress).catch(error=>{
+    connectButton.disabled=false;
+    disconnectButton.style.display='inline-block';
+    walletNetwork.textContent=chainName;
+    showConnectProgress('Loading…', 'Loading your data…');
+    try{
+      await AquaApi.loadForAddress(walletAddress);
+    }catch(error){
       AquaApi.clearDashboard();
       const status=document.getElementById('api-status');
       if(status){status.textContent='API: unavailable';status.className='api-status offline'}
       console.warn('API refresh failed:',error);
-    });
-    disconnectButton.style.display='inline-block';
-    walletNetwork.textContent=chainName;
+    }
+    resetConnectButtons();
   }catch(error){
+    resetConnectButtons();
     if(error.code !== 4001) console.error('Wallet connection failed:', error);
+  }finally{
+    walletConnectInFlight=false;
   }
 }
 
@@ -130,8 +180,7 @@ function disconnectWallet(){
   walletSigner=undefined;
   walletAddress=undefined;
   AquaWeb3.setWalletProvider(undefined,undefined);
-  connectButton.textContent='Connect wallet';
-  connectButton.title='';
+  resetConnectButtons();
   disconnectButton.style.display='none';
   walletNetwork.textContent=configuredChain?.name || 'Ethereum';
   AquaApi.clearDashboard();
@@ -368,12 +417,225 @@ document.addEventListener('click',e=>{
     document.querySelectorAll('.month-panel').forEach(x=>x.classList.toggle('active',x.dataset.panel===mt.dataset.month));
   }
 });
+const createOrderButton=document.getElementById('create-order-btn');
+const createOrderError=document.getElementById('create-order-error');
+
+function showCreateOrderError(error){
+  if(!createOrderError) return;
+  createOrderError.textContent=error?AquaWeb3.readableError(error):'';
+  createOrderError.hidden=!error;
+}
+
+function isLendOrder(){
+  return document.querySelector('[data-order-type].active')?.dataset.orderType==='lend';
+}
+
+function parseDebtInput(id){
+  const raw=document.getElementById(id)?.value;
+  if(!String(raw||'').trim()) throw new Error('Enter both order amounts');
+  return AquaWeb3.parseTokenAmount(raw,AquaApi.debtDecimals());
+}
+
+function orderDeadlineUnix(maturity){
+  const enabled=document.getElementById('show-deadline')?.checked;
+  const value=document.getElementById('order-deadline')?.value;
+  if(!enabled || !value) return maturity;
+  const unix=Math.floor(new Date(value).getTime()/1000);
+  if(!Number.isFinite(unix)) throw new Error('Order deadline is invalid');
+  return unix;
+}
+
+function configuredContracts(){
+  const chain=AquaConfig.AQUA_CHAIN;
+  const contracts=AquaConfig.AquaContracts[chain]||{};
+  return {
+    chain,
+    app:contracts.app||AquaWeb3.getAddress('app',chain),
+    aqua:contracts.aqua||AquaWeb3.getAddress('aqua',chain),
+    debtToken:contracts.debtToken||AquaApi.debtToken()?.address,
+  };
+}
+
+async function shipOrder({orderId,strategyFn,token,amount,label}){
+  const {app}=configuredContracts();
+  const strategy=await AquaWeb3.readContract({
+    contractKey:'app',
+    abi:AquaConfig.AquaABIs.app,
+    functionName:strategyFn,
+    args:[orderId],
+  });
+  await AquaWeb3.writeContract({
+    contractKey:'aqua',
+    abi:AquaConfig.AquaABIs.aqua,
+    functionName:'ship',
+    args:[app,strategy,[token],[amount]],
+    label,
+  });
+}
+
+async function createOrder(){
+  if(!walletSigner) return connectWallet();
+  showCreateOrderError('');
+  const maturity=Number(document.getElementById('maturity-select')?.value);
+  if(!maturity) throw new Error('Select a maturity');
+  const deadline=orderDeadlineUnix(maturity);
+  if(deadline<=Math.floor(Date.now()/1000)) throw new Error('Order deadline must be in the future');
+  const {app,aqua,debtToken}=configuredContracts();
+  const vault=AquaApi.vaultForMaturity(maturity)
+    || await AquaWeb3.readContract({
+      contractKey:'app',
+      abi:AquaConfig.AquaABIs.app,
+      functionName:'vaultForMaturity',
+      args:[maturity],
+    });
+  if(!vault || vault===AquaConfig.ZERO_ADDRESS) throw new Error('This maturity is not supported by the deployed app.');
+
+  if(isLendOrder()){
+    const debtTokenIn=parseDebtInput('lend-now');
+    const minTermOut=parseDebtInput('lend-receive');
+    if(!debtToken) throw new Error('Debt token is not configured');
+    await AquaWeb3.ensureAllowance({token:debtToken,spender:aqua,amount:debtTokenIn,symbol:AquaApi.debtSymbol()});
+    const receipt=await AquaWeb3.writeContract({
+      contractKey:'app',
+      abi:AquaConfig.AquaABIs.app,
+      functionName:'createSupplyOrder',
+      args:[maturity,debtTokenIn,minTermOut,deadline],
+      label:'Create lending order',
+    });
+    const event=AquaWeb3.parseEvent(receipt,AquaConfig.AquaABIs.app,'SupplyOrderCreated');
+    if(event?.args?.orderId==null) throw new Error('Order was created but the order id could not be read');
+    await shipOrder({
+      orderId:event.args.orderId,
+      strategyFn:'supplyStrategyBytes',
+      token:debtToken,
+      amount:debtTokenIn,
+      label:'Activate order on Aqua',
+    });
+  }else{
+    const minDebtTokenOut=parseDebtInput('borrow-receive');
+    const faceAmount=parseDebtInput('borrow-repay');
+    const ltvPct=parseFloat(document.getElementById('max-ltv')?.value);
+    const ltvBps=Math.round(ltvPct*100);
+    if(!Number.isFinite(ltvPct) || ltvBps<=0 || ltvBps>10000) throw new Error('Maximum LTV must be between 0 and 100%');
+    const collateral=AquaApi.selectedCollateral('order-collateral-select');
+    if(!collateral) throw new Error('Select a collateral token');
+    await AquaWeb3.ensureAllowance({token:collateral.address,spender:app,amount:ethers.MaxUint256,symbol:collateral.symbol});
+    const receipt=await AquaWeb3.writeContract({
+      contractKey:'app',
+      abi:AquaConfig.AquaABIs.app,
+      functionName:'createBorrowOrder',
+      args:[maturity,faceAmount,minDebtTokenOut,ltvBps,collateral.id,deadline],
+      label:'Create borrow order',
+    });
+    const event=AquaWeb3.parseEvent(receipt,AquaConfig.AquaABIs.app,'BorrowOrderCreated');
+    if(event?.args?.orderId==null) throw new Error('Order was created but the order id could not be read');
+    const shares=await AquaApi.previewDebtShares(maturity,faceAmount);
+    await AquaWeb3.ensureAllowance({token:vault,spender:aqua,amount:shares,symbol:AquaApi.maturityLabel(maturity)});
+    await shipOrder({
+      orderId:event.args.orderId,
+      strategyFn:'borrowStrategyBytes',
+      token:vault,
+      amount:shares,
+      label:'Activate order on Aqua',
+    });
+  }
+  await refreshPortfolioAfterTransaction();
+  show('portfolio');
+}
+
+async function cancelOrder(side,orderId){
+  if(!walletSigner) return connectWallet();
+  await AquaWeb3.writeContract({
+    contractKey:'app',
+    abi:AquaConfig.AquaABIs.app,
+    functionName:side==='supply'?'cancelSupplyOrder':'cancelBorrowOrder',
+    args:[orderId],
+    label:'Cancel order',
+  });
+  await refreshPortfolioAfterTransaction();
+}
+
+async function matchOrders(borrowOrderId,supplyOrderId,faceAmount,debtTokenAmount){
+  if(!walletSigner) return connectWallet();
+  await AquaWeb3.writeContract({
+    contractKey:'app',
+    abi:AquaConfig.AquaABIs.app,
+    functionName:'matchOrders',
+    args:[borrowOrderId,supplyOrderId,faceAmount,debtTokenAmount],
+    label:'Match orders',
+  });
+  await refreshPortfolioAfterTransaction();
+}
+
+async function repayDebt(maturity,amount){
+  if(!walletSigner) return connectWallet();
+  const {app,debtToken}=configuredContracts();
+  if(!debtToken) throw new Error('Debt token is not configured');
+  await AquaWeb3.ensureAllowance({token:debtToken,spender:app,amount,symbol:AquaApi.debtSymbol()});
+  await AquaWeb3.writeContract({
+    contractKey:'app',
+    abi:AquaConfig.AquaABIs.app,
+    functionName:'repay',
+    args:[maturity,amount],
+    label:'Repay debt',
+  });
+  await refreshPortfolioAfterTransaction();
+}
+
+async function redeemShares(vault,shares){
+  if(!walletSigner) return connectWallet();
+  if(!walletAddress) throw new Error('Wallet is not connected');
+  await AquaWeb3.writeContract({
+    address:vault,
+    abi:AquaConfig.AquaABIs.vault,
+    functionName:'redeem',
+    args:[shares,walletAddress,walletAddress],
+    label:'Redeem maturity shares',
+  });
+  await refreshPortfolioAfterTransaction();
+}
+
+createOrderButton.addEventListener('click',()=>{
+  createOrderButton.disabled=true;
+  createOrder()
+    .catch(error=>{
+      showCreateOrderError(error);
+      console.warn('Create order failed:',error);
+    })
+    .finally(()=>{createOrderButton.disabled=false});
+});
+['borrow-receive','borrow-repay','lend-now','lend-receive','max-ltv','order-deadline'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('input',()=>showCreateOrderError(''));
+});
+
 document.addEventListener('click',e=>{
   const cancel=e.target.closest('[data-cancel-order]');
   if(cancel){
-    cancel.textContent='Cancelled';
-    cancel.disabled=true;
-    cancel.closest('.order-row')?.querySelector('.pill')?.replaceChildren(document.createTextNode('Cancelled'));
+    e.preventDefault();
+    const side=cancel.dataset.cancelOrder;
+    const orderId=cancel.dataset.orderId;
+    cancelOrder(side,orderId).catch(error=>console.warn('Cancel failed:',error));
+    return;
+  }
+  const match=e.target.closest('[data-match-borrow]');
+  if(match){
+    e.preventDefault();
+    matchOrders(match.dataset.matchBorrow,match.dataset.matchSupply,match.dataset.matchFace,match.dataset.matchDebt)
+      .catch(error=>console.warn('Match failed:',error));
+    return;
+  }
+  const repay=e.target.closest('[data-repay-maturity]');
+  if(repay){
+    e.preventDefault();
+    repayDebt(repay.dataset.repayMaturity,repay.dataset.repayAmount)
+      .catch(error=>console.warn('Repay failed:',error));
+    return;
+  }
+  const redeem=e.target.closest('[data-redeem-vault]');
+  if(redeem){
+    e.preventDefault();
+    redeemShares(redeem.dataset.redeemVault,redeem.dataset.redeemShares)
+      .catch(error=>console.warn('Redeem failed:',error));
   }
 });
 window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
