@@ -74,8 +74,9 @@ const AquaApi={
     if(collateralSelect) collateralSelect.replaceChildren();
     const depositSelect=document.getElementById('deposit-token-select');
     if(depositSelect) depositSelect.replaceChildren();
-    const depositBalance=document.getElementById('deposit-token-balance');
-    if(depositBalance) depositBalance.textContent='';
+    ['deposit-token-balance','deposited-token-balance'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.textContent='';
+    });
     document.querySelectorAll('.maturity-tab').forEach(tab=>{tab.textContent='';tab.hidden=false;});
     document.querySelectorAll('#portfolio > .grid, #portfolio > .card').forEach(section=>{section.hidden=true;});
     const portfolioHead=document.querySelector('#portfolio > .page-head');
@@ -153,10 +154,12 @@ const AquaApi={
 
   updateDepositBalance(){
     const token=this.selectedCollateral();
-    const balanceEl=document.getElementById('deposit-token-balance');
-    if(!balanceEl) return;
-    const item=this.portfolio?.wallet?.find(entry=>entry.token.symbol===token?.symbol);
-    balanceEl.textContent=token&&item?`${ethers.formatUnits(item.amount,token.decimals)} ${token.symbol}`:'';
+    const walletBalanceEl=document.getElementById('deposit-token-balance');
+    const depositedBalanceEl=document.getElementById('deposited-token-balance');
+    const walletItem=this.portfolio?.wallet?.find(entry=>entry.token.symbol===token?.symbol);
+    const depositedItem=this.portfolio?.collateral?.find(entry=>entry.token.symbol===token?.symbol);
+    if(walletBalanceEl) walletBalanceEl.textContent=token&&walletItem?`${ethers.formatUnits(walletItem.amount,token.decimals)} ${token.symbol}`:'';
+    if(depositedBalanceEl) depositedBalanceEl.textContent=token&&depositedItem?`${ethers.formatUnits(depositedItem.amount,token.decimals)} ${token.symbol}`:'';
   },
 
   renderOpenOrders(data){
