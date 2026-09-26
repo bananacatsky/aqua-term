@@ -8,7 +8,7 @@ from typing import Any
 from web3 import Web3
 from web3.contract import Contract
 
-from config import EVM_RPC_URLS, SETTINGS, AppConfig
+from config import CHAIN_BLOCK_TIME_SECONDS, EVM_RPC_URLS, SETTINGS, AppConfig
 from db import Database
 
 log = logging.getLogger(__name__)
@@ -28,9 +28,18 @@ def load_contract(w3: Web3, address: str) -> Contract:
     return w3.eth.contract(address=Web3.to_checksum_address(address), abi=abi)
 
 
+def rolling_sync_floor_block(w3: Web3, chain: str, head: int, configured_from: int) -> int:
+    block_time = CHAIN_BLOCK_TIME_SECONDS.get(chain.lower(), 12.0)
+    blocks_back = int(SETTINGS.sync_max_age_seconds / block_time)
+    month_floor = max(0, head - blocks_back)
+    return max(configured_from, month_floor)
+
+
 class ChainSyncer:
     def __init__(self, database: Database):
         self.database = database
+        self._block_ts_cache: dict[int, int] = {}
+        self._w3: Web3 | None = None
 
     def ensure_apps(self, apps: tuple[AppConfig, ...]) -> None:
         for app in apps:
@@ -45,33 +54,59 @@ class ChainSyncer:
                     "Failed syncing app %s on %s", app["address"], app["chain"]
                 )
 
+    def _block_timestamp(self, w3: Web3, block_number: int) -> int:
+        cached = self._block_ts_cache.get(block_number)
+        if cached is not None:
+            return cached
+        ts = int(w3.eth.get_block(block_number)["timestamp"])
+        self._block_ts_cache[block_number] = ts
+        return ts
+
     def sync_app(self, address: str, chain: str) -> None:
         app = self.database.get_app(address, chain)
         if app is None:
             raise ValueError(f"App {address} on {chain} is not registered")
 
         w3 = make_web3(chain)
+        self._w3 = w3
+        self._block_ts_cache.clear()
         if not w3.is_connected():
             raise ConnectionError(f"RPC unavailable for chain {chain}")
 
         contract = load_contract(w3, address)
         head = w3.eth.block_number
-        from_block = app["last_synced_block"] + 1
+        head_ts = self._block_timestamp(w3, head)
+        month_floor = rolling_sync_floor_block(
+            w3, chain, head, int(app["from_block"])
+        )
+        last_synced = int(app["last_synced_block"])
+        if last_synced < month_floor - 1:
+            self.database.purge_orders_before_block(address, chain, month_floor)
+            self.database.set_last_synced_block(address, chain, month_floor - 1)
+            last_synced = month_floor - 1
+
+        from_block = max(last_synced + 1, month_floor)
         if from_block > head:
             if SETTINGS.refresh_open_orders:
-                self.refresh_open_orders(address, chain, contract)
+                self.refresh_open_orders(address, chain, contract, head_ts=head_ts)
             return
 
         while from_block <= head:
             to_block = min(from_block + SETTINGS.sync_block_chunk - 1, head)
             self._sync_block_range(
-                address, chain, contract, from_block=from_block, to_block=to_block
+                address,
+                chain,
+                contract,
+                w3=w3,
+                from_block=from_block,
+                to_block=to_block,
             )
             self.database.set_last_synced_block(address, chain, to_block)
             from_block = to_block + 1
 
         if SETTINGS.refresh_open_orders:
-            self.refresh_open_orders(address, chain, contract)
+            self.refresh_open_orders(address, chain, contract, head_ts=head_ts)
+        self.database.set_last_refresh_at(address, chain, float(head_ts))
 
     def _sync_block_range(
         self,
@@ -79,6 +114,7 @@ class ChainSyncer:
         chain: str,
         contract: Contract,
         *,
+        w3: Web3,
         from_block: int,
         to_block: int,
     ) -> None:
@@ -93,10 +129,23 @@ class ChainSyncer:
             for entry in logs:
                 if entry["address"].lower() != checksum.lower():
                     continue
-                handler(address, chain, entry, block_number=entry["blockNumber"])
+                block_number = int(entry["blockNumber"])
+                handler(
+                    address,
+                    chain,
+                    entry,
+                    block_number=block_number,
+                    block_timestamp=self._block_timestamp(w3, block_number),
+                )
 
     def _handle_borrow_created(
-        self, address: str, chain: str, entry: dict[str, Any], *, block_number: int
+        self,
+        address: str,
+        chain: str,
+        entry: dict[str, Any],
+        *,
+        block_number: int,
+        block_timestamp: int,
     ) -> None:
         args = entry["args"]
         face_amount = int(args["faceAmount"])
@@ -118,11 +167,18 @@ class ChainSyncer:
                 "created_block": block_number,
                 "quote_num": str(min_out),
                 "quote_den": str(face_amount),
-            }
+            },
+            synced_at=block_timestamp,
         )
 
     def _handle_supply_created(
-        self, address: str, chain: str, entry: dict[str, Any], *, block_number: int
+        self,
+        address: str,
+        chain: str,
+        entry: dict[str, Any],
+        *,
+        block_number: int,
+        block_timestamp: int,
     ) -> None:
         args = entry["args"]
         debt_in = int(args["debtTokenIn"])
@@ -142,11 +198,18 @@ class ChainSyncer:
                 "created_block": block_number,
                 "quote_num": str(min_out),
                 "quote_den": str(debt_in),
-            }
+            },
+            synced_at=block_timestamp,
         )
 
     def _handle_orders_matched(
-        self, address: str, chain: str, entry: dict[str, Any], *, block_number: int
+        self,
+        address: str,
+        chain: str,
+        entry: dict[str, Any],
+        *,
+        block_number: int,
+        block_timestamp: int,
     ) -> None:
         del block_number
         args = entry["args"]
@@ -154,21 +217,33 @@ class ChainSyncer:
         supply_id = int(args["supplyOrderId"])
         face_amount = int(args["faceAmount"])
         debt_amount = int(args["borrowerDebtTokenOut"]) + int(args["matcherDebtToken"])
-        self.database.add_borrow_fill(address, chain, borrow_id, face_amount)
-        self.database.add_supply_fill(address, chain, supply_id, debt_amount)
+        self.database.add_borrow_fill(
+            address, chain, borrow_id, face_amount, synced_at=block_timestamp
+        )
+        self.database.add_supply_fill(
+            address, chain, supply_id, debt_amount, synced_at=block_timestamp
+        )
 
-    def refresh_open_orders(self, address: str, chain: str, contract: Contract) -> None:
+    def refresh_open_orders(
+        self,
+        address: str,
+        chain: str,
+        contract: Contract,
+        *,
+        head_ts: int,
+    ) -> None:
         for order_id in self.database.open_borrow_order_ids(address, chain):
             row = contract.functions.borrowOrders(order_id).call()
             self.database.upsert_borrow_order(
-                self._borrow_row_from_chain(address, chain, order_id, row)
+                self._borrow_row_from_chain(address, chain, order_id, row),
+                synced_at=head_ts,
             )
         for order_id in self.database.open_supply_order_ids(address, chain):
             row = contract.functions.supplyOrders(order_id).call()
             self.database.upsert_supply_order(
-                self._supply_row_from_chain(address, chain, order_id, row)
+                self._supply_row_from_chain(address, chain, order_id, row),
+                synced_at=head_ts,
             )
-        self.database.set_last_refresh_at(address, chain, __import__("time").time())
 
     @staticmethod
     def _borrow_row_from_chain(

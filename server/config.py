@@ -60,6 +60,7 @@ class Settings:
     orderbook_db: str = os.getenv("ORDERBOOK_DB", str(_SERVER_DIR / "orderbook.db"))
     sync_interval_seconds: float = float(os.getenv("SYNC_INTERVAL_SECONDS", "12"))
     sync_block_chunk: int = int(os.getenv("SYNC_BLOCK_CHUNK", "2000"))
+    sync_max_age_seconds: int = int(os.getenv("SYNC_MAX_AGE_SECONDS", str(30 * 24 * 3600)))
     refresh_open_orders: bool = env_bool("REFRESH_OPEN_ORDERS", True)
     aquaterm_apps: tuple[AppConfig, ...] = (
         parse_apps(os.getenv("AQUATERM_APPS", "")) if os.getenv("AQUATERM_APPS") else ()
@@ -77,4 +78,16 @@ EVM_RPC_URLS = {
     "op": SETTINGS.optimism_rpc_url,
     "arbitrum": SETTINGS.arbitrum_rpc_url,
     "arb": SETTINGS.arbitrum_rpc_url,
+}
+
+# Approximate block time in seconds per chain (for rolling sync window).
+CHAIN_BLOCK_TIME_SECONDS = {
+    "ethereum": 12.0,
+    "eth": 12.0,
+    "mainnet": 12.0,
+    "base": 2.0,
+    "optimism": 2.0,
+    "op": 2.0,
+    "arbitrum": 0.25,
+    "arb": 0.25,
 }

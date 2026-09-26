@@ -26,7 +26,19 @@ def _fresh_db(tmp_path, monkeypatch):
     database.close()
 
 
+def _touch_maturity(maturity: int = 1735689600, *, block_ts: int | None = None) -> None:
+    import time
+
+    database.touch_maturity_sync(
+        "0x0000000000000000000000000000000000000abc",
+        "ethereum",
+        maturity,
+        int(time.time()) if block_ts is None else block_ts,
+    )
+
+
 def _seed_orders() -> None:
+    _touch_maturity()
     database.upsert_borrow_order(
         {
             "app_address": "0x0000000000000000000000000000000000000abc",

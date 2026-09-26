@@ -100,6 +100,33 @@ def orderbook() -> Any:
             }
         ), 404
 
+    fresh, maturity_sync = database.maturity_sync_is_fresh(
+        app_address,
+        chain,
+        maturity,
+        SETTINGS.sync_max_age_seconds,
+    )
+    if not fresh:
+        if maturity_sync is None:
+            return jsonify(
+                {
+                    "error": "Maturity has not been synced yet",
+                    "app": app_address,
+                    "chain": chain,
+                    "maturity": maturity,
+                }
+            ), 503
+        return jsonify(
+            {
+                "error": "Sync data is stale",
+                "app": app_address,
+                "chain": chain,
+                "maturity": maturity,
+                "last_synced_at": maturity_sync["last_synced_at"],
+                "max_age_seconds": SETTINGS.sync_max_age_seconds,
+            }
+        ), 503
+
     sell_items, sell_total = database.list_sell_orders(
         app_address,
         chain,
@@ -126,6 +153,8 @@ def orderbook() -> Any:
                 "from_block": registered["from_block"],
                 "last_synced_block": registered["last_synced_block"],
                 "last_refresh_at": registered["last_refresh_at"],
+                "last_synced_at": maturity_sync["last_synced_at"],
+                "max_age_seconds": SETTINGS.sync_max_age_seconds,
             },
             "sell": {
                 "items": sell_items,

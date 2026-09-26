@@ -90,6 +90,14 @@ class Database:
                     ON borrow_orders(app_address, chain, maturity, cancelled);
                 CREATE INDEX IF NOT EXISTS idx_supply_orders_book
                     ON supply_orders(app_address, chain, maturity, cancelled);
+
+                CREATE TABLE IF NOT EXISTS maturity_sync (
+                    app_address     TEXT NOT NULL,
+                    chain           TEXT NOT NULL,
+                    maturity        INTEGER NOT NULL,
+                    last_synced_at  REAL NOT NULL,
+                    PRIMARY KEY (app_address, chain, maturity)
+                );
                 """
             )
 
@@ -144,7 +152,68 @@ class Database:
                 (ts, address.lower(), chain.lower()),
             )
 
-    def upsert_borrow_order(self, order: dict[str, Any]) -> None:
+    def touch_maturity_sync(
+        self, app_address: str, chain: str, maturity: int, synced_at: int
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO maturity_sync (app_address, chain, maturity, last_synced_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(app_address, chain, maturity) DO UPDATE SET
+                    last_synced_at = MAX(maturity_sync.last_synced_at, excluded.last_synced_at)
+                """,
+                (app_address.lower(), chain.lower(), int(maturity), int(synced_at)),
+            )
+
+    def get_maturity_sync(
+        self, app_address: str, chain: str, maturity: int
+    ) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM maturity_sync
+                WHERE app_address = ? AND chain = ? AND maturity = ?
+                """,
+                (app_address.lower(), chain.lower(), int(maturity)),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def maturity_sync_is_fresh(
+        self, app_address: str, chain: str, maturity: int, max_age_seconds: int
+    ) -> tuple[bool, dict[str, Any] | None]:
+        row = self.get_maturity_sync(app_address, chain, maturity)
+        if row is None:
+            return False, None
+        age = time.time() - float(row["last_synced_at"])
+        return age <= max_age_seconds, row
+
+    def purge_orders_before_block(
+        self, app_address: str, chain: str, block: int
+    ) -> None:
+        app_address = app_address.lower()
+        chain = chain.lower()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                DELETE FROM borrow_orders
+                WHERE app_address = ? AND chain = ?
+                  AND created_block IS NOT NULL AND created_block < ?
+                """,
+                (app_address, chain, block),
+            )
+            conn.execute(
+                """
+                DELETE FROM supply_orders
+                WHERE app_address = ? AND chain = ?
+                  AND created_block IS NOT NULL AND created_block < ?
+                """,
+                (app_address, chain, block),
+            )
+
+    def upsert_borrow_order(
+        self, order: dict[str, Any], *, synced_at: int | None = None
+    ) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
@@ -163,8 +232,14 @@ class Database:
                 """,
                 order,
             )
+        if synced_at is not None:
+            self.touch_maturity_sync(
+                order["app_address"], order["chain"], order["maturity"], synced_at
+            )
 
-    def upsert_supply_order(self, order: dict[str, Any]) -> None:
+    def upsert_supply_order(
+        self, order: dict[str, Any], *, synced_at: int | None = None
+    ) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
@@ -183,14 +258,24 @@ class Database:
                 """,
                 order,
             )
+        if synced_at is not None:
+            self.touch_maturity_sync(
+                order["app_address"], order["chain"], order["maturity"], synced_at
+            )
 
     def add_borrow_fill(
-        self, app_address: str, chain: str, order_id: int, face_amount: int
+        self,
+        app_address: str,
+        chain: str,
+        order_id: int,
+        face_amount: int,
+        *,
+        synced_at: int | None = None,
     ) -> None:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT filled_face FROM borrow_orders
+                SELECT maturity, filled_face FROM borrow_orders
                 WHERE app_address = ? AND chain = ? AND order_id = ?
                 """,
                 (app_address.lower(), chain.lower(), order_id),
@@ -205,14 +290,22 @@ class Database:
                 """,
                 (str(new_filled), app_address.lower(), chain.lower(), order_id),
             )
+        if synced_at is not None:
+            self.touch_maturity_sync(app_address, chain, int(row["maturity"]), synced_at)
 
     def add_supply_fill(
-        self, app_address: str, chain: str, order_id: int, debt_token_amount: int
+        self,
+        app_address: str,
+        chain: str,
+        order_id: int,
+        debt_token_amount: int,
+        *,
+        synced_at: int | None = None,
     ) -> None:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT filled_debt_token FROM supply_orders
+                SELECT maturity, filled_debt_token FROM supply_orders
                 WHERE app_address = ? AND chain = ? AND order_id = ?
                 """,
                 (app_address.lower(), chain.lower(), order_id),
@@ -227,6 +320,8 @@ class Database:
                 """,
                 (str(new_filled), app_address.lower(), chain.lower(), order_id),
             )
+        if synced_at is not None:
+            self.touch_maturity_sync(app_address, chain, int(row["maturity"]), synced_at)
 
     def open_borrow_order_ids(self, app_address: str, chain: str) -> list[int]:
         now = int(time.time())
