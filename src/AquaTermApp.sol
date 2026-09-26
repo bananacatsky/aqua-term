@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "./interfaces/IERC20.sol";
-import {IAqua} from "./interfaces/IAqua.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IAqua} from "@1inch/aqua/src/interfaces/IAqua.sol";
+import {AquaApp} from "@1inch/aqua/src/AquaApp.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {AquaTermVault} from "./AquaTermVault.sol";
 
-/// @notice Dependency-light MVP of AquaTerm's fixed-maturity borrowing app.
+/// @notice Fixed-maturity borrowing app backed by Aqua virtual balances.
 /// Aqua holds virtual order capacity; this contract only creates debt on a match.
-contract AquaTermApp {
+contract AquaTermApp is AquaApp, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     uint256 internal constant BPS = 10_000;
     uint256 internal constant WAD = 1e18;
 
-    IAqua public immutable aqua;
     IERC20 public immutable usdt;
     IOracle public immutable oracle;
 
@@ -21,6 +24,7 @@ contract AquaTermApp {
     mapping(uint40 => AquaTermVault) public vaultForMaturity;
     mapping(address => mapping(uint8 => uint256)) public depositedCollateral;
     mapping(address => mapping(address => uint256)) public debtByVault;
+    mapping(address => mapping(address => uint256)) public writtenDownByVault;
     mapping(address => uint256) public totalDebt;
 
     struct BorrowOrder {
@@ -45,9 +49,9 @@ contract AquaTermApp {
         IAqua aqua_, IERC20 usdt_, IOracle oracle_, IERC20[2] memory collateralTokens,
         uint16[2] memory maxBorrowLtvs, uint16[2] memory liquidationLtvs,
         uint40[] memory maturities, string[] memory names, string[] memory symbols
-    ) {
+    ) AquaApp(aqua_) {
         require(maturities.length == names.length && maturities.length == symbols.length, "BAD_MATURITY_CONFIG");
-        aqua = aqua_; usdt = usdt_; oracle = oracle_;
+        usdt = usdt_; oracle = oracle_;
         for (uint256 i; i < 2; ++i) {
             require(maxBorrowLtvs[i] < liquidationLtvs[i] && liquidationLtvs[i] <= BPS, "BAD_LTV_CONFIG");
             collateralConfigs[i] = CollateralConfig(collateralTokens[i], maxBorrowLtvs[i], liquidationLtvs[i]);
@@ -58,17 +62,17 @@ contract AquaTermApp {
         }
     }
 
-    function depositCollateral(uint8 collateralId, uint256 amount) external {
+    function depositCollateral(uint8 collateralId, uint256 amount) external nonReentrant {
         require(collateralId < 2, "BAD_COLLATERAL");
         depositedCollateral[msg.sender][collateralId] += amount;
-        require(collateralConfigs[collateralId].token.transferFrom(msg.sender, address(this), amount), "COLLATERAL_TRANSFER_FAILED");
+        collateralConfigs[collateralId].token.safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    function withdrawCollateral(uint8 collateralId, uint256 amount) external {
+    function withdrawCollateral(uint8 collateralId, uint256 amount) external nonReentrant {
         require(collateralId < 2 && depositedCollateral[msg.sender][collateralId] >= amount, "INSUFFICIENT_COLLATERAL");
         depositedCollateral[msg.sender][collateralId] -= amount;
         require(healthFactor(msg.sender) >= WAD, "UNHEALTHY");
-        require(collateralConfigs[collateralId].token.transfer(msg.sender, amount), "COLLATERAL_TRANSFER_FAILED");
+        collateralConfigs[collateralId].token.safeTransfer(msg.sender, amount);
     }
 
     function collateralValue(address borrower) public view returns (uint256 value) {
@@ -120,7 +124,7 @@ contract AquaTermApp {
     function cancelBorrowOrder(uint256 id) external { require(borrowOrders[id].borrower == msg.sender, "NOT_BORROWER"); borrowOrders[id].cancelled = true; }
     function cancelSupplyOrder(uint256 id) external { require(supplyOrders[id].supplier == msg.sender, "NOT_SUPPLIER"); supplyOrders[id].cancelled = true; }
 
-    function matchOrders(uint256 borrowOrderId, uint256 supplyOrderId, uint256 faceAmount, uint256 usdtAmount) external {
+    function matchOrders(uint256 borrowOrderId, uint256 supplyOrderId, uint256 faceAmount, uint256 usdtAmount) external nonReentrant {
         BorrowOrder storage b = borrowOrders[borrowOrderId]; SupplyOrder storage s = supplyOrders[supplyOrderId];
         require(!b.cancelled && !s.cancelled, "CANCELLED");
         require(b.maturity == s.maturity && block.timestamp < b.maturity, "BAD_MATURITY");
@@ -136,25 +140,32 @@ contract AquaTermApp {
         totalDebt[b.borrower] = newDebt;
         debtByVault[b.borrower][address(vault)] += faceAmount;
         vault.mintDebtShares(b.borrower, faceAmount);
-        aqua.pull(b.borrower, borrowStrategyHash(borrowOrderId), address(vault), faceAmount, s.supplier);
-        aqua.pull(s.supplier, supplyStrategyHash(supplyOrderId), address(usdt), usdtAmount, b.borrower);
+        AQUA.pull(b.borrower, borrowStrategyHash(borrowOrderId), address(vault), faceAmount, s.supplier);
+        AQUA.pull(s.supplier, supplyStrategyHash(supplyOrderId), address(usdt), usdtAmount, b.borrower);
         b.filledFace += uint128(faceAmount); s.filledUsdt += uint128(usdtAmount);
         emit OrdersMatched(borrowOrderId, supplyOrderId, faceAmount, usdtAmount);
     }
 
-    function repay(uint40 maturity, uint256 amount) external {
+    function repay(uint40 maturity, uint256 amount) external nonReentrant {
         AquaTermVault vault = vaultForMaturity[maturity]; require(address(vault) != address(0), "UNSUPPORTED_MATURITY");
         uint256 debt = debtByVault[msg.sender][address(vault)]; require(amount != 0 && amount <= debt, "TOO_MUCH");
         debtByVault[msg.sender][address(vault)] = debt - amount; totalDebt[msg.sender] -= amount;
-        require(usdt.transferFrom(msg.sender, address(vault), amount), "REPAYMENT_TRANSFER_FAILED"); vault.recordRepayment(amount);
+        uint256 writtenDown = writtenDownByVault[msg.sender][address(vault)];
+        uint256 recovered = amount < writtenDown ? amount : writtenDown;
+        writtenDownByVault[msg.sender][address(vault)] = writtenDown - recovered;
+        usdt.safeTransferFrom(msg.sender, address(vault), amount);
+        vault.recordRepayment(amount, recovered);
     }
 
-    /// @notice Permissionless maturity write-down; collateral recovery is intentionally outside MVP scope.
-    function markBadDebt(address borrower, uint40 maturity, uint256 amount) external {
+    /// @notice Permissionless maturity write-down. The borrower still owes the debt and collateral stays locked.
+    function markBadDebt(address borrower, uint40 maturity, uint256 amount) external nonReentrant {
         AquaTermVault vault = vaultForMaturity[maturity]; require(address(vault) != address(0), "UNSUPPORTED_MATURITY");
         require(block.timestamp >= maturity, "NOT_MATURED");
-        uint256 debt = debtByVault[borrower][address(vault)]; require(amount != 0 && amount <= debt, "TOO_MUCH");
-        debtByVault[borrower][address(vault)] = debt - amount; totalDebt[borrower] -= amount; vault.writeDown(amount);
+        uint256 debt = debtByVault[borrower][address(vault)];
+        uint256 writtenDown = writtenDownByVault[borrower][address(vault)];
+        require(amount != 0 && amount <= debt - writtenDown, "TOO_MUCH");
+        writtenDownByVault[borrower][address(vault)] = writtenDown + amount;
+        vault.writeDown(amount);
         emit BadDebtMarked(borrower, maturity, amount);
     }
 

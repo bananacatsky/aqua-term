@@ -1,35 +1,63 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ERC20} from "./token/ERC20.sol";
-import {IERC20} from "./interfaces/IERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @notice One maturity's portfolio. Shares are created solely against loans
-/// originated by AquaTermApp, never when virtual Aqua liquidity is posted.
-contract AquaTermVault is ERC20 {
-    IERC20 public immutable asset;
+/// @notice A fixed-maturity claim on cash and performing loans.
+/// @dev Shares originate only when the app fills a loan; ordinary deposits are disabled.
+contract AquaTermVault is ERC4626 {
     address public immutable app;
     uint40 public immutable maturity;
     uint256 public totalDebt;
     uint256 public badDebt;
 
-    modifier onlyApp() { require(msg.sender == app, "ONLY_APP"); _; }
+    modifier onlyApp() {
+        require(msg.sender == app, "ONLY_APP");
+        _;
+    }
 
     constructor(IERC20 asset_, address app_, uint40 maturity_, string memory name_, string memory symbol_)
-        ERC20(name_, symbol_, 6)
-    { asset = asset_; app = app_; maturity = maturity_; }
+        ERC20(name_, symbol_)
+        ERC4626(asset_)
+    {
+        require(app_ != address(0), "ZERO_APP");
+        app = app_;
+        maturity = maturity_;
+    }
 
-    function totalAssets() public view returns (uint256) {
-        return asset.balanceOf(address(this)) + totalDebt - badDebt;
+    function totalAssets() public view override returns (uint256) {
+        return IERC20(asset()).balanceOf(address(this)) + totalDebt - badDebt;
+    }
+
+    function maxDeposit(address) public pure override returns (uint256) { return 0; }
+    function maxMint(address) public pure override returns (uint256) { return 0; }
+
+    function maxWithdraw(address owner) public view override returns (uint256) {
+        if (block.timestamp < maturity) return 0;
+        return Math.min(super.maxWithdraw(owner), IERC20(asset()).balanceOf(address(this)));
+    }
+
+    function maxRedeem(address owner) public view override returns (uint256) {
+        if (block.timestamp < maturity) return 0;
+        uint256 ownerShares = balanceOf(owner);
+        uint256 cash = IERC20(asset()).balanceOf(address(this));
+        if (previewRedeem(ownerShares) <= cash) return ownerShares;
+        return convertToShares(cash);
     }
 
     function mintDebtShares(address receiver, uint256 faceAmount) external onlyApp {
+        require(block.timestamp < maturity, "MATURED");
         totalDebt += faceAmount;
         _mint(receiver, faceAmount);
     }
 
-    function recordRepayment(uint256 amount) external onlyApp {
+    function recordRepayment(uint256 amount, uint256 recoveredBadDebt) external onlyApp {
+        require(recoveredBadDebt <= amount && recoveredBadDebt <= badDebt, "BAD_RECOVERY");
         totalDebt -= amount;
+        badDebt -= recoveredBadDebt;
     }
 
     function writeDown(uint256 amount) external onlyApp {
@@ -37,19 +65,11 @@ contract AquaTermVault is ERC20 {
         badDebt += amount;
     }
 
-    /// @notice ERC-4626-like redemption at post-maturity NAV. Losses are shared pro rata.
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets) {
+    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
+        internal override
+    {
         require(block.timestamp >= maturity, "NOT_MATURED");
-        if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender];
-            require(allowed >= shares, "ERC20: insufficient allowance");
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
-        }
-        uint256 supply = totalSupply;
-        require(supply != 0, "NO_SHARES");
-        assets = shares * totalAssets() / supply;
-        require(asset.balanceOf(address(this)) >= assets, "INSUFFICIENT_CASH");
-        _burn(owner, shares);
-        require(asset.transfer(receiver, assets), "ASSET_TRANSFER_FAILED");
+        require(assets <= IERC20(asset()).balanceOf(address(this)), "INSUFFICIENT_CASH");
+        super._withdraw(caller, receiver, owner, assets, shares);
     }
 }
