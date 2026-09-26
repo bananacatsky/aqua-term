@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 
-/// @notice Values configured collateral tokens in USDT using Chainlink USD feeds.
+/// @notice Values configured collateral tokens in the debt token using Chainlink USD feeds.
 /// @dev Feed addresses and freshness limits are fixed at deployment; select them for the target chain.
 contract ChainlinkOracle is IOracle {
     struct FeedConfig {
@@ -53,7 +53,7 @@ contract ChainlinkOracle is IOracle {
         }
     }
 
-    function valueInUSDT(address token, uint256 amount) external view returns (uint256) {
+    function valueInDebtToken(address token, uint256 amount) external view returns (uint256) {
         FeedConfig memory config = collateralFeed[token];
         require(address(config.feed) != address(0), "UNSUPPORTED_COLLATERAL");
         uint256 collateralPrice = _priceWad(config);

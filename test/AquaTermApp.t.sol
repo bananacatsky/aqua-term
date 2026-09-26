@@ -24,14 +24,14 @@ contract AquaTermAppTest {
     Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
     address internal borrower = address(0xB0B);
     address internal supplier = address(0x5A11);
-    MockERC20 internal usdt;
+    MockERC20 internal debtToken;
     MockERC20 internal weth;
     MockERC20 internal wbtc;
     MockERC20 internal alt;
     MockChainlinkFeed internal ethFeed;
     MockChainlinkFeed internal btcFeed;
     MockChainlinkFeed internal altFeed;
-    MockChainlinkFeed internal usdtFeed;
+    MockChainlinkFeed internal debtTokenFeed;
     ChainlinkOracle internal oracle;
     Aqua internal aqua;
     AquaTermApp internal app;
@@ -41,14 +41,14 @@ contract AquaTermAppTest {
     uint256 internal constant SPOT = 480e6;
 
     function setUp() public {
-        usdt = new MockERC20("USDT", "USDT", 6);
+        debtToken = new MockERC20("USDT", "USDT", 6);
         weth = new MockERC20("Wrapped Ether", "WETH", 18);
         wbtc = new MockERC20("Wrapped Bitcoin", "WBTC", 8);
         alt = new MockERC20("Alternative Collateral", "ALT", 18);
         ethFeed = new MockChainlinkFeed(8, 1000e8);
         btcFeed = new MockChainlinkFeed(8, 100_000e8);
         altFeed = new MockChainlinkFeed(8, 2e8);
-        usdtFeed = new MockChainlinkFeed(8, 1e8);
+        debtTokenFeed = new MockChainlinkFeed(8, 1e8);
 
         IERC20Metadata[] memory oracleTokens = new IERC20Metadata[](3);
         oracleTokens[0] = IERC20Metadata(address(weth)); oracleTokens[1] = IERC20Metadata(address(wbtc));
@@ -60,8 +60,8 @@ contract AquaTermAppTest {
         uint32[] memory collateralMaxDelays = new uint32[](3);
         collateralMaxDelays[0] = 1 days; collateralMaxDelays[1] = 1 days; collateralMaxDelays[2] = 1 days;
         oracle = new ChainlinkOracle(
-            IERC20Metadata(address(usdt)), oracleTokens, collateralFeeds, collateralMaxDelays,
-            AggregatorV3Interface(address(usdtFeed)), 1 days
+            IERC20Metadata(address(debtToken)), oracleTokens, collateralFeeds, collateralMaxDelays,
+            AggregatorV3Interface(address(debtTokenFeed)), 1 days
         );
         aqua = new Aqua();
 
@@ -73,14 +73,14 @@ contract AquaTermAppTest {
         uint40[] memory maturities = new uint40[](1); maturities[0] = maturity;
         string[] memory names = new string[](1); names[0] = "AquaTerm USDT";
         string[] memory symbols = new string[](1); symbols[0] = "USDT-TERM";
-        app = new AquaTermApp(IAqua(address(aqua)), IERC20(address(usdt)), oracle, collateral, maxLtvs, liqLtvs, maturities, names, symbols);
+        app = new AquaTermApp(IAqua(address(aqua)), IERC20(address(debtToken)), oracle, collateral, maxLtvs, liqLtvs, maturities, names, symbols);
 
         weth.mint(borrower, 1e18);
         alt.mint(borrower, 1e18);
-        usdt.mint(supplier, 2_000e6);
+        debtToken.mint(supplier, 2_000e6);
         vm.prank(borrower); weth.approve(address(app), type(uint256).max);
         vm.prank(borrower); alt.approve(address(app), type(uint256).max);
-        vm.prank(supplier); usdt.approve(address(aqua), type(uint256).max);
+        vm.prank(supplier); debtToken.approve(address(aqua), type(uint256).max);
     }
 
     function _ship(address maker, bytes memory strategy, address token, uint256 amount) internal {
@@ -102,7 +102,7 @@ contract AquaTermAppTest {
         vault = app.vaultForMaturity(maturity);
         vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
         _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(face));
-        _ship(supplier, app.supplyStrategyBytes(sId), address(usdt), spot);
+        _ship(supplier, app.supplyStrategyBytes(sId), address(debtToken), spot);
         app.matchOrders(bId, sId, face, spot);
     }
 
@@ -115,64 +115,64 @@ contract AquaTermAppTest {
         vault = _shipAndMatch(FACE, SPOT);
         _assertEq(app.depositedCollateral(borrower, 0), 833_333_334_000_000_000, "collateral pulled JIT");
         _assertEq(weth.balanceOf(borrower), 166_666_666_000_000_000, "only required collateral taken");
-        _assertEq(vault.asset(), address(usdt), "ERC4626 asset");
+        _assertEq(vault.asset(), address(debtToken), "ERC4626 asset");
         _assertEq(vault.balanceOf(supplier), FACE, "supplier receives shares");
         _assertEq(vault.totalAssets(), FACE, "NAV includes receivable");
         _assertEq(vault.maxRedeem(supplier), 0, "locked until maturity");
-        _assertEq(usdt.balanceOf(borrower), SPOT, "borrower receives spot USDT");
-        usdt.mint(borrower, FACE - SPOT);
-        vm.startPrank(borrower); usdt.approve(address(app), FACE); app.repay(maturity, FACE); vm.stopPrank();
+        _assertEq(debtToken.balanceOf(borrower), SPOT, "borrower receives debt token");
+        debtToken.mint(borrower, FACE - SPOT);
+        vm.startPrank(borrower); debtToken.approve(address(app), FACE); app.repay(maturity, FACE); vm.stopPrank();
         _assertEq(vault.totalAssets(), FACE, "repayment preserves NAV");
         vm.warp(maturity);
         _assertEq(vault.maxRedeem(supplier), FACE, "fully redeemable");
         vm.prank(supplier); vault.redeem(FACE, supplier, supplier);
-        _assertEq(usdt.balanceOf(supplier), 2_000e6 + 20e6, "supplier earns discount");
+        _assertEq(debtToken.balanceOf(supplier), 2_000e6 + 20e6, "supplier earns discount");
     }
 
     function testFullOrdersPayTermShareSpreadToMatcher() public {
         address matcher = address(0xA11CE);
         uint256 face = 110e6;
-        uint256 usdtIn = 100e6;
+        uint256 debtTokenIn = 100e6;
         uint256 supplierMinTerm = 105e6;
-        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(usdtIn), 6000, 0);
-        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(usdtIn), uint128(supplierMinTerm));
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(debtTokenIn), 6000, 0);
+        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(debtTokenIn), uint128(supplierMinTerm));
         AquaTermVault vault = app.vaultForMaturity(maturity);
         vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
         _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(face));
-        _ship(supplier, app.supplyStrategyBytes(sId), address(usdt), usdtIn);
+        _ship(supplier, app.supplyStrategyBytes(sId), address(debtToken), debtTokenIn);
 
-        vm.prank(matcher); app.matchOrders(bId, sId, face, usdtIn);
+        vm.prank(matcher); app.matchOrders(bId, sId, face, debtTokenIn);
 
         (,,,,,, uint128 filledFace,) = app.borrowOrders(bId);
-        (,,,, uint128 filledUsdt,) = app.supplyOrders(sId);
+        (,,,, uint128 filledDebtToken,) = app.supplyOrders(sId);
         _assertEq(filledFace, face, "borrow order fully closed");
-        _assertEq(filledUsdt, usdtIn, "supply order fully closed");
-        _assertEq(usdt.balanceOf(borrower), usdtIn, "borrower receives its limit");
+        _assertEq(filledDebtToken, debtTokenIn, "supply order fully closed");
+        _assertEq(debtToken.balanceOf(borrower), debtTokenIn, "borrower receives its limit");
         _assertEq(vault.balanceOf(supplier), supplierMinTerm, "supplier receives its limit");
         _assertEq(vault.balanceOf(matcher), face - supplierMinTerm, "matcher receives term-share spread");
     }
 
-    function testFullOrdersPayUsdtSpreadToMatcher() public {
+    function testFullOrdersPayDebtTokenSpreadToMatcher() public {
         address matcher = address(0xA11CE);
         uint256 face = 105e6;
-        uint256 borrowerMinUsdt = 95e6;
-        uint256 usdtIn = 100e6;
-        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(borrowerMinUsdt), 6000, 0);
-        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(usdtIn), uint128(face));
+        uint256 borrowerMinDebtToken = 95e6;
+        uint256 debtTokenIn = 100e6;
+        vm.prank(borrower); (uint256 bId,) = app.createBorrowOrder(maturity, uint128(face), uint128(borrowerMinDebtToken), 6000, 0);
+        vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, uint128(debtTokenIn), uint128(face));
         AquaTermVault vault = app.vaultForMaturity(maturity);
         vm.prank(borrower); vault.approve(address(aqua), type(uint256).max);
         _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(face));
-        _ship(supplier, app.supplyStrategyBytes(sId), address(usdt), usdtIn);
+        _ship(supplier, app.supplyStrategyBytes(sId), address(debtToken), debtTokenIn);
 
-        vm.prank(matcher); app.matchOrders(bId, sId, face, usdtIn);
+        vm.prank(matcher); app.matchOrders(bId, sId, face, debtTokenIn);
 
         (,,,,,, uint128 filledFace,) = app.borrowOrders(bId);
-        (,,,, uint128 filledUsdt,) = app.supplyOrders(sId);
+        (,,,, uint128 filledDebtToken,) = app.supplyOrders(sId);
         _assertEq(filledFace, face, "borrow order fully closed");
-        _assertEq(filledUsdt, usdtIn, "supply order fully closed");
-        _assertEq(usdt.balanceOf(borrower), borrowerMinUsdt, "borrower receives its limit");
+        _assertEq(filledDebtToken, debtTokenIn, "supply order fully closed");
+        _assertEq(debtToken.balanceOf(borrower), borrowerMinDebtToken, "borrower receives its limit");
         _assertEq(vault.balanceOf(supplier), face, "supplier receives its limit");
-        _assertEq(usdt.balanceOf(matcher), usdtIn - borrowerMinUsdt, "matcher receives USDT spread");
+        _assertEq(debtToken.balanceOf(matcher), debtTokenIn - borrowerMinDebtToken, "matcher receives debt-token spread");
     }
 
     function testExistingCollateralNeedsNoAdditionalWalletTransfer() public {
@@ -224,7 +224,7 @@ contract AquaTermAppTest {
         vm.prank(supplier); (uint256 sId,) = app.createSupplyOrder(maturity, 576e6, 600e6);
         AquaTermVault vault = app.vaultForMaturity(maturity);
         _ship(borrower, app.borrowStrategyBytes(bId), address(vault), vault.previewDebtShares(600e6));
-        _ship(supplier, app.supplyStrategyBytes(sId), address(usdt), 576e6);
+        _ship(supplier, app.supplyStrategyBytes(sId), address(debtToken), 576e6);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "INSUFFICIENT_WALLET_COLLATERAL"));
         app.matchOrders(bId, sId, 600e6, 576e6);
         _assertEq(app.totalDebt(borrower), FACE, "failed fill changes no debt");
@@ -241,12 +241,12 @@ contract AquaTermAppTest {
         ethFeed.setAnswer(1000e8);
         btcFeed.setAnswer(100_000e8);
         altFeed.setAnswer(2e8);
-        usdtFeed.setAnswer(1e8);
+        debtTokenFeed.setAnswer(1e8);
         uint256 lockedCollateral = app.depositedCollateral(borrower, 0);
         vm.prank(borrower);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "UNHEALTHY"));
         app.withdrawCollateral(0, lockedCollateral);
-        vm.startPrank(borrower); usdt.approve(address(app), FACE); app.repay(maturity, 200e6); vm.stopPrank();
+        vm.startPrank(borrower); debtToken.approve(address(app), FACE); app.repay(maturity, 200e6); vm.stopPrank();
         _assertEq(vault.totalAssets(), FACE, "late recovery restores NAV");
         _assertEq(vault.badDebt(), 0, "recovered write-down cleared");
     }
@@ -256,8 +256,8 @@ contract AquaTermAppTest {
         ethFeed.setAnswer(400e8);
         address liquidator = address(0x11A);
         uint256 repayAmount = 100e6;
-        usdt.mint(liquidator, repayAmount);
-        vm.prank(liquidator); usdt.approve(address(app), repayAmount);
+        debtToken.mint(liquidator, repayAmount);
+        vm.prank(liquidator); debtToken.approve(address(app), repayAmount);
 
         uint256 liquidatorWethBefore = weth.balanceOf(liquidator);
         uint256 borrowerCollateralBefore = app.depositedCollateral(borrower, 0);
@@ -269,7 +269,7 @@ contract AquaTermAppTest {
         _assertEq(vault.totalAssets(), FACE, "cash replaces repaid receivable");
         _assertEq(app.depositedCollateral(borrower, 0), borrowerCollateralBefore - seized, "collateral accounting reduced");
         require(seized != 0 && weth.balanceOf(liquidator) == liquidatorWethBefore + seized, "liquidator receives WETH");
-        _assertEq(usdt.balanceOf(liquidator), 0, "liquidator funds repayment");
+        _assertEq(debtToken.balanceOf(liquidator), 0, "liquidator funds repayment");
     }
 
     function testBadDebtLossStaysWithLegacySupplierCohort() public {
@@ -281,8 +281,8 @@ contract AquaTermAppTest {
         ethFeed.setAnswer(600e8);
         address liquidator = address(0x11A);
         uint256 recovered = 98e6;
-        usdt.mint(liquidator, recovered);
-        vm.prank(liquidator); usdt.approve(address(app), recovered);
+        debtToken.mint(liquidator, recovered);
+        vm.prank(liquidator); debtToken.approve(address(app), recovered);
         vm.prank(liquidator); app.liquidate(borrower, maturity, 0, recovered, "");
 
         _assertEq(app.debtByVault(borrower, address(vault)), 2e6, "uncovered residual borrower debt remains");
@@ -296,9 +296,9 @@ contract AquaTermAppTest {
         address laterBorrower = address(0xB022);
         address laterSupplier = address(0x5A112);
         weth.mint(laterBorrower, 1e18);
-        usdt.mint(laterSupplier, 2_000e6);
+        debtToken.mint(laterSupplier, 2_000e6);
         vm.prank(laterBorrower); weth.approve(address(app), type(uint256).max);
-        vm.prank(laterSupplier); usdt.approve(address(aqua), type(uint256).max);
+        vm.prank(laterSupplier); debtToken.approve(address(aqua), type(uint256).max);
         uint256 newFace = 100e6;
         uint256 newSpot = 98e6;
         vm.prank(laterBorrower);
@@ -308,44 +308,44 @@ contract AquaTermAppTest {
         (uint256 sId,) = app.createSupplyOrder(maturity, uint128(newSpot), uint128(newShares));
         vm.prank(laterBorrower); vault.approve(address(aqua), type(uint256).max);
         _ship(laterBorrower, app.borrowStrategyBytes(bId), address(vault), newShares);
-        _ship(laterSupplier, app.supplyStrategyBytes(sId), address(usdt), newSpot);
+        _ship(laterSupplier, app.supplyStrategyBytes(sId), address(debtToken), newSpot);
         app.matchOrders(bId, sId, newFace, newSpot);
         _assertEq(vault.balanceOf(laterSupplier), newShares, "late supplier receives NAV-priced shares");
         require(newShares > newFace, "shares account for the prior loss");
 
         // Repay the performing loan. At maturity each cohort exits against its own share price.
-        usdt.mint(laterBorrower, newFace - newSpot);
+        debtToken.mint(laterBorrower, newFace - newSpot);
         vm.startPrank(laterBorrower);
-        usdt.approve(address(app), newFace);
+        debtToken.approve(address(app), newFace);
         app.repay(maturity, newFace);
         vm.stopPrank();
         vm.warp(maturity);
-        uint256 oldBalanceBefore = usdt.balanceOf(supplier);
+        uint256 oldBalanceBefore = debtToken.balanceOf(supplier);
         vm.prank(supplier);
         vault.redeem(oldFace, supplier, supplier);
-        uint256 oldPayout = usdt.balanceOf(supplier) - oldBalanceBefore;
-        uint256 lateBalanceBefore = usdt.balanceOf(laterSupplier);
+        uint256 oldPayout = debtToken.balanceOf(supplier) - oldBalanceBefore;
+        uint256 lateBalanceBefore = debtToken.balanceOf(laterSupplier);
         vm.prank(laterSupplier);
         vault.redeem(newShares, laterSupplier, laterSupplier);
-        uint256 latePayout = usdt.balanceOf(laterSupplier) - lateBalanceBefore;
+        uint256 latePayout = debtToken.balanceOf(laterSupplier) - lateBalanceBefore;
         require(oldPayout >= 98e6 - 2 && oldPayout <= 98e6 + 2, "legacy cohort absorbs bad debt");
         require(latePayout >= 100e6 - 2 && latePayout <= 100e6 + 2, "late cohort exits at par");
     }
 
     function testChainlinkOracleUsesDecimalsAndUSDTPrice() public {
-        _assertEq(oracle.valueInUSDT(address(weth), 1e18), 1000e6, "WETH value");
-        _assertEq(oracle.valueInUSDT(address(wbtc), 1e8), 100_000e6, "WBTC value");
-        usdtFeed.setAnswer(8e7);
-        _assertEq(oracle.valueInUSDT(address(weth), 1e18), 1250e6, "USDT depeg conversion");
+        _assertEq(oracle.valueInDebtToken(address(weth), 1e18), 1000e6, "WETH value");
+        _assertEq(oracle.valueInDebtToken(address(wbtc), 1e8), 100_000e6, "WBTC value");
+        debtTokenFeed.setAnswer(8e7);
+        _assertEq(oracle.valueInDebtToken(address(weth), 1e18), 1250e6, "USDT depeg conversion");
     }
 
     function testChainlinkOracleRejectsStaleAndInvalidAnswers() public {
         vm.warp(block.timestamp + 2 days);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "STALE_FEED"));
-        oracle.valueInUSDT(address(weth), 1e18);
+        oracle.valueInDebtToken(address(weth), 1e18);
         ethFeed.setAnswer(-1);
         vm.expectRevert(abi.encodeWithSignature("Error(string)", "INVALID_FEED_ANSWER"));
-        oracle.valueInUSDT(address(weth), 1e18);
+        oracle.valueInDebtToken(address(weth), 1e18);
     }
 
     function _assertEq(uint256 a, uint256 b, string memory reason) internal pure { require(a == b, reason); }

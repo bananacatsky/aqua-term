@@ -4,9 +4,9 @@ Fixed-rate, fixed-maturity collateralized borrowing using 1inch Aqua virtual bal
 
 ## 1. Idea
 
-A borrower sells a claim on future USDT to receive less USDT today. For example, a supplier pays 480 USDT now for 500 USDT of maturity shares. The borrower owes 500 USDT at maturity; the 20 USDT difference is the supplier's fixed yield if the debt is repaid in full.
+A borrower sells a claim on future debt tokens to receive fewer debt tokens today. For the USDT example deployment, a supplier pays 480 USDT now for 500 USDT of maturity shares. The borrower owes 500 USDT at maturity; the 20 USDT difference is the supplier's fixed yield if the debt is repaid in full.
 
-There is one ERC-4626 vault per maturity. Its underlying asset is USDT, and its shares are the maturity claims. `AquaTermApp` holds borrower collateral, tracks debt across all maturities and settles matches through Aqua.
+There is one ERC-4626 vault per maturity. Its underlying asset is the configured debt token, and its shares are the maturity claims. `AquaTermApp` holds borrower collateral, tracks debt across all maturities and settles matches through Aqua.
 
 ## 2. Orders and virtual balances
 
@@ -17,16 +17,16 @@ A borrow order records:
 ```text
 borrower
 maturity
-face amount of future USDT to sell
-minimum spot USDT to receive
+face amount of future debt tokens to sell
+minimum spot debt tokens to receive
 maximum portfolio LTV immediately after each fill
 collateral token to pull from the wallet if a top-up is needed
 amount already filled / cancellation state
 ```
 
-A supply order records the supplier, maturity, spot USDT offered, minimum maturity shares required, amount already filled and cancellation state.
+A supply order records the supplier, maturity, spot debt tokens offered, minimum maturity shares required, amount already filled and cancellation state.
 
-Each party separately calls Aqua `ship` with the bytes of its app order and a virtual balance: maturity shares for the borrower, USDT for the supplier. `ship` does not transfer tokens. Maturity shares do not exist yet; the app mints them only when a borrow order fills. The borrower approves the chosen collateral token to `AquaTermApp` for any wallet top-up and approves the maturity shares to Aqua. The supplier approves USDT to Aqua.
+Each party separately calls Aqua `ship` with the bytes of its app order and a virtual balance: maturity shares for the borrower, debt tokens for the supplier. `ship` does not transfer tokens. Maturity shares do not exist yet; the app mints them only when a borrow order fills. The borrower approves the chosen collateral token to `AquaTermApp` for any wallet top-up and approves the maturity shares to Aqua. The supplier approves the debt token to Aqua.
 
 Several unfilled orders may advertise the same borrowing capacity across maturities. Posting or shipping an order does not create debt or transfer additional collateral. Aqua stores virtual balances; it does not find matching AquaTerm orders. A caller must identify compatible orders and submit the match transaction.
 
@@ -70,9 +70,9 @@ Any caller may propose two order IDs and fill amounts. The app performs the foll
 ```text
 require both orders active and for the same unexpired maturity
 require positive amounts within both orders' unfilled balances
-borrowerUsdtOut = ceil(borrowOrder.minUsdtOut * faceAmount / borrowOrder.faceAmount)
-supplierTermShares = ceil(supplyOrder.minTermOut * usdtAmount / supplyOrder.usdtIn)
-require usdtAmount >= borrowerUsdtOut
+borrowerDebtTokenOut = ceil(borrowOrder.minDebtTokenOut * faceAmount / borrowOrder.faceAmount)
+supplierTermShares = ceil(supplyOrder.minTermOut * debtTokenAmount / supplyOrder.debtTokenIn)
+require debtTokenAmount >= borrowerDebtTokenOut
 
 newDebt = borrower.totalDebt + faceAmount
 count the borrower's existing deposits across all configured collateral tokens
@@ -84,12 +84,12 @@ shares = vault.previewDebtShares(faceAmount) // current NAV before this loan is 
 mint shares to the borrower against the new faceAmount receivable
 Aqua.pull supplierTermShares from borrower to supplier
 Aqua.pull (shares - supplierTermShares) from borrower to msg.sender
-Aqua.pull borrowerUsdtOut from supplier to borrower
-Aqua.pull (usdtAmount - borrowerUsdtOut) from supplier to msg.sender
+Aqua.pull borrowerDebtTokenOut from supplier to borrower
+Aqua.pull (debtTokenAmount - borrowerDebtTokenOut) from supplier to msg.sender
 record the filled amounts and emit the match event
 ```
 
-The caller of `matchOrders` receives the spread: excess maturity shares when the borrow order offers more shares than the supply order requires, excess USDT when the supply order provides more USDT than the borrow order requires, or both. An order is fully filled when all of the asset it ships is consumed (`faceAmount` for a borrow order, `usdtIn` for a supply order). The app mints the shares before Aqua transfers them. The real tokens move only during the match. If any check, collateral transfer or Aqua pull fails, the whole transaction reverts, including the collateral top-up and debt creation. Later fills recompute risk against the updated aggregate debt and current prices.
+The caller of `matchOrders` receives the spread: excess maturity shares when the borrow order offers more shares than the supply order requires, excess debt tokens when the supply order provides more than the borrow order requires, or both. An order is fully filled when all of the asset it ships is consumed (`faceAmount` for a borrow order, `debtTokenIn` for a supply order). The app mints the shares before Aqua transfers them. The real tokens move only during the match. If any check, collateral transfer or Aqua pull fails, the whole transaction reverts, including the collateral top-up and debt creation. Later fills recompute risk against the updated aggregate debt and current prices.
 
 ## 5. Vault accounting, repayment and redemption
 

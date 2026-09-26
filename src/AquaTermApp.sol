@@ -21,7 +21,7 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
     uint256 public constant LIQUIDATION_DISCOUNT_MIN_BPS = 500;
     uint256 public constant LIQUIDATION_DISCOUNT_MAX_BPS = 1_500;
 
-    IERC20 public immutable usdt;
+    IERC20 public immutable debtToken;
     IOracle public immutable oracle;
 
     struct CollateralConfig { IERC20 token; uint16 maxBorrowLtvBps; uint16 liquidationLtvBps; }
@@ -35,36 +35,36 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
     uint40[] internal supportedMaturities;
 
     struct BorrowOrder {
-        address borrower; uint40 maturity; uint128 faceAmount; uint128 minUsdtOut;
+        address borrower; uint40 maturity; uint128 faceAmount; uint128 minDebtTokenOut;
         uint16 ltvBps; uint256 collateralId; uint128 filledFace; bool cancelled;
     }
     struct SupplyOrder {
-        address supplier; uint40 maturity; uint128 usdtIn; uint128 minTermOut;
-        uint128 filledUsdt; bool cancelled;
+        address supplier; uint40 maturity; uint128 debtTokenIn; uint128 minTermOut;
+        uint128 filledDebtToken; bool cancelled;
     }
     struct MatchSettlement {
-        uint256 borrowerUsdtOut;
+        uint256 borrowerDebtTokenOut;
         uint256 supplierTermShares;
         uint256 matcherTermShares;
-        uint256 matcherUsdt;
+        uint256 matcherDebtToken;
     }
     uint256 public nextBorrowOrderId;
     uint256 public nextSupplyOrderId;
     mapping(uint256 => BorrowOrder) public borrowOrders;
     mapping(uint256 => SupplyOrder) public supplyOrders;
 
-    event BorrowOrderCreated(uint256 indexed orderId, address indexed borrower, uint40 maturity, uint256 faceAmount, uint256 minUsdtOut, uint256 ltvBps, uint256 collateralId);
+    event BorrowOrderCreated(uint256 indexed orderId, address indexed borrower, uint40 maturity, uint256 faceAmount, uint256 minDebtTokenOut, uint256 ltvBps, uint256 collateralId);
     event CollateralPulled(address indexed borrower, uint256 indexed collateralId, uint256 amount);
-    event SupplyOrderCreated(uint256 indexed orderId, address indexed supplier, uint40 maturity, uint256 usdtIn, uint256 minTermOut);
+    event SupplyOrderCreated(uint256 indexed orderId, address indexed supplier, uint40 maturity, uint256 debtTokenIn, uint256 minTermOut);
     event OrdersMatched(
         uint256 indexed borrowOrderId,
         uint256 indexed supplyOrderId,
         address indexed matcher,
         uint256 faceAmount,
         uint256 supplierTermShares,
-        uint256 borrowerUsdtOut,
+        uint256 borrowerDebtTokenOut,
         uint256 matcherTermShares,
-        uint256 matcherUsdt
+        uint256 matcherDebtToken
     );
     event BadDebtMarked(address indexed borrower, uint40 indexed maturity, uint256 amount);
     event Liquidated(
@@ -78,13 +78,13 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
     );
 
     constructor(
-        IAqua aqua_, IERC20 usdt_, IOracle oracle_, IERC20[] memory collateralTokens,
+        IAqua aqua_, IERC20 debtToken_, IOracle oracle_, IERC20[] memory collateralTokens,
         uint16[] memory maxBorrowLtvs, uint16[] memory liquidationLtvs,
         uint40[] memory maturities, string[] memory names, string[] memory symbols
     ) AquaApp(aqua_) {
         require(maturities.length == names.length && maturities.length == symbols.length, "BAD_MATURITY_CONFIG");
         require(collateralTokens.length != 0 && collateralTokens.length == maxBorrowLtvs.length && collateralTokens.length == liquidationLtvs.length, "BAD_COLLATERAL_CONFIG");
-        usdt = usdt_; oracle = oracle_;
+        debtToken = debtToken_; oracle = oracle_;
         N_COLLATERAL = collateralTokens.length;
         for (uint256 i; i < N_COLLATERAL; ++i) {
             require(maxBorrowLtvs[i] != 0 && maxBorrowLtvs[i] < liquidationLtvs[i] && liquidationLtvs[i] <= BPS, "BAD_LTV_CONFIG");
@@ -94,7 +94,7 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         }
         for (uint256 i; i < maturities.length; ++i) {
             require(address(vaultForMaturity[maturities[i]]) == address(0), "DUPLICATE_MATURITY");
-            vaultForMaturity[maturities[i]] = new AquaTermVault(usdt_, address(this), maturities[i], names[i], symbols[i]);
+            vaultForMaturity[maturities[i]] = new AquaTermVault(debtToken_, address(this), maturities[i], names[i], symbols[i]);
             supportedMaturities.push(maturities[i]);
         }
     }
@@ -116,18 +116,18 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
     }
 
     function collateralValue(address borrower) public view returns (uint256 value) {
-        for (uint256 i; i < N_COLLATERAL; ++i) value += oracle.valueInUSDT(address(collateralConfigs[i].token), depositedCollateral[borrower][i]);
+        for (uint256 i; i < N_COLLATERAL; ++i) value += oracle.valueInDebtToken(address(collateralConfigs[i].token), depositedCollateral[borrower][i]);
     }
 
     function portfolioWeightedMaxBorrowLtv(address borrower) public view returns (uint256) {
         uint256 value; uint256 weighted;
-        for (uint256 i; i < N_COLLATERAL; ++i) { uint256 v = oracle.valueInUSDT(address(collateralConfigs[i].token), depositedCollateral[borrower][i]); value += v; weighted += v * collateralConfigs[i].maxBorrowLtvBps; }
+        for (uint256 i; i < N_COLLATERAL; ++i) { uint256 v = oracle.valueInDebtToken(address(collateralConfigs[i].token), depositedCollateral[borrower][i]); value += v; weighted += v * collateralConfigs[i].maxBorrowLtvBps; }
         return value == 0 ? 0 : weighted / value;
     }
 
     function portfolioWeightedLiquidationLtv(address borrower) public view returns (uint256) {
         uint256 value; uint256 weighted;
-        for (uint256 i; i < N_COLLATERAL; ++i) { uint256 v = oracle.valueInUSDT(address(collateralConfigs[i].token), depositedCollateral[borrower][i]); value += v; weighted += v * collateralConfigs[i].liquidationLtvBps; }
+        for (uint256 i; i < N_COLLATERAL; ++i) { uint256 v = oracle.valueInDebtToken(address(collateralConfigs[i].token), depositedCollateral[borrower][i]); value += v; weighted += v * collateralConfigs[i].liquidationLtvBps; }
         return value == 0 ? 0 : weighted / value;
     }
 
@@ -142,54 +142,54 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         return value == 0 ? (totalDebt[borrower] == 0 ? 0 : type(uint256).max) : totalDebt[borrower] * BPS / value;
     }
 
-    function createBorrowOrder(uint40 maturity, uint128 faceAmount, uint128 minUsdtOut, uint16 ltvBps, uint256 collateralId) external returns (uint256 orderId, bytes32 strategyHash) {
+    function createBorrowOrder(uint40 maturity, uint128 faceAmount, uint128 minDebtTokenOut, uint16 ltvBps, uint256 collateralId) external returns (uint256 orderId, bytes32 strategyHash) {
         require(address(vaultForMaturity[maturity]) != address(0), "UNSUPPORTED_MATURITY");
-        require(faceAmount != 0 && minUsdtOut != 0, "ZERO_ORDER");
+        require(faceAmount != 0 && minDebtTokenOut != 0, "ZERO_ORDER");
         require(ltvBps != 0 && ltvBps <= BPS, "BAD_ORDER_LTV");
         require(collateralId < N_COLLATERAL, "BAD_COLLATERAL");
         orderId = nextBorrowOrderId++;
-        borrowOrders[orderId] = BorrowOrder(msg.sender, maturity, faceAmount, minUsdtOut, ltvBps, collateralId, 0, false);
+        borrowOrders[orderId] = BorrowOrder(msg.sender, maturity, faceAmount, minDebtTokenOut, ltvBps, collateralId, 0, false);
         strategyHash = borrowStrategyHash(orderId);
-        emit BorrowOrderCreated(orderId, msg.sender, maturity, faceAmount, minUsdtOut, ltvBps, collateralId);
+        emit BorrowOrderCreated(orderId, msg.sender, maturity, faceAmount, minDebtTokenOut, ltvBps, collateralId);
     }
 
-    function createSupplyOrder(uint40 maturity, uint128 usdtIn, uint128 minTermOut) external returns (uint256 orderId, bytes32 strategyHash) {
+    function createSupplyOrder(uint40 maturity, uint128 debtTokenIn, uint128 minTermOut) external returns (uint256 orderId, bytes32 strategyHash) {
         require(address(vaultForMaturity[maturity]) != address(0), "UNSUPPORTED_MATURITY");
-        require(usdtIn != 0 && minTermOut != 0, "ZERO_ORDER");
+        require(debtTokenIn != 0 && minTermOut != 0, "ZERO_ORDER");
         orderId = nextSupplyOrderId++;
-        supplyOrders[orderId] = SupplyOrder(msg.sender, maturity, usdtIn, minTermOut, 0, false);
+        supplyOrders[orderId] = SupplyOrder(msg.sender, maturity, debtTokenIn, minTermOut, 0, false);
         strategyHash = supplyStrategyHash(orderId);
-        emit SupplyOrderCreated(orderId, msg.sender, maturity, usdtIn, minTermOut);
+        emit SupplyOrderCreated(orderId, msg.sender, maturity, debtTokenIn, minTermOut);
     }
 
     function cancelBorrowOrder(uint256 id) external { require(borrowOrders[id].borrower == msg.sender, "NOT_BORROWER"); borrowOrders[id].cancelled = true; }
     function cancelSupplyOrder(uint256 id) external { require(supplyOrders[id].supplier == msg.sender, "NOT_SUPPLIER"); supplyOrders[id].cancelled = true; }
 
-    function matchOrders(uint256 borrowOrderId, uint256 supplyOrderId, uint256 faceAmount, uint256 usdtAmount) external nonReentrant {
+    function matchOrders(uint256 borrowOrderId, uint256 supplyOrderId, uint256 faceAmount, uint256 debtTokenAmount) external nonReentrant {
         BorrowOrder storage b = borrowOrders[borrowOrderId]; SupplyOrder storage s = supplyOrders[supplyOrderId];
         require(!b.cancelled && !s.cancelled, "CANCELLED");
         require(b.maturity == s.maturity && block.timestamp < b.maturity, "BAD_MATURITY");
-        require(faceAmount != 0 && usdtAmount != 0, "ZERO_FILL");
+        require(faceAmount != 0 && debtTokenAmount != 0, "ZERO_FILL");
         require(faceAmount <= uint256(b.faceAmount) - b.filledFace, "BORROW_OVERFILL");
-        require(usdtAmount <= uint256(s.usdtIn) - s.filledUsdt, "SUPPLY_OVERFILL");
+        require(debtTokenAmount <= uint256(s.debtTokenIn) - s.filledDebtToken, "SUPPLY_OVERFILL");
         MatchSettlement memory settlement;
-        settlement.borrowerUsdtOut = Math.ceilDiv(uint256(b.minUsdtOut) * faceAmount, b.faceAmount);
-        require(usdtAmount >= settlement.borrowerUsdtOut, "BORROW_PRICE");
+        settlement.borrowerDebtTokenOut = Math.ceilDiv(uint256(b.minDebtTokenOut) * faceAmount, b.faceAmount);
+        require(debtTokenAmount >= settlement.borrowerDebtTokenOut, "BORROW_PRICE");
         uint256 newDebt = totalDebt[b.borrower] + faceAmount;
         _topUpCollateral(b.borrower, b.collateralId, b.ltvBps, newDebt);
         AquaTermVault vault = vaultForMaturity[b.maturity];
         totalDebt[b.borrower] = newDebt;
         debtByVault[b.borrower][address(vault)] += faceAmount;
         uint256 termShares = vault.mintDebtShares(b.borrower, faceAmount);
-        settlement.supplierTermShares = Math.ceilDiv(uint256(s.minTermOut) * usdtAmount, s.usdtIn);
+        settlement.supplierTermShares = Math.ceilDiv(uint256(s.minTermOut) * debtTokenAmount, s.debtTokenIn);
         require(termShares >= settlement.supplierTermShares, "SUPPLY_PRICE");
         settlement.matcherTermShares = termShares - settlement.supplierTermShares;
-        settlement.matcherUsdt = usdtAmount - settlement.borrowerUsdtOut;
+        settlement.matcherDebtToken = debtTokenAmount - settlement.borrowerDebtTokenOut;
         _settleAqua(b, s, borrowOrderId, supplyOrderId, address(vault), settlement);
-        b.filledFace += uint128(faceAmount); s.filledUsdt += uint128(usdtAmount);
+        b.filledFace += uint128(faceAmount); s.filledDebtToken += uint128(debtTokenAmount);
         emit OrdersMatched(
-            borrowOrderId, supplyOrderId, msg.sender, faceAmount, settlement.supplierTermShares, settlement.borrowerUsdtOut,
-            settlement.matcherTermShares, settlement.matcherUsdt
+            borrowOrderId, supplyOrderId, msg.sender, faceAmount, settlement.supplierTermShares, settlement.borrowerDebtTokenOut,
+            settlement.matcherTermShares, settlement.matcherDebtToken
         );
     }
 
@@ -205,9 +205,9 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         if (settlement.matcherTermShares != 0) {
             AQUA.pull(b.borrower, borrowStrategyHash(borrowOrderId), vault, settlement.matcherTermShares, msg.sender);
         }
-        AQUA.pull(s.supplier, supplyStrategyHash(supplyOrderId), address(usdt), settlement.borrowerUsdtOut, b.borrower);
-        if (settlement.matcherUsdt != 0) {
-            AQUA.pull(s.supplier, supplyStrategyHash(supplyOrderId), address(usdt), settlement.matcherUsdt, msg.sender);
+        AQUA.pull(s.supplier, supplyStrategyHash(supplyOrderId), address(debtToken), settlement.borrowerDebtTokenOut, b.borrower);
+        if (settlement.matcherDebtToken != 0) {
+            AQUA.pull(s.supplier, supplyStrategyHash(supplyOrderId), address(debtToken), settlement.matcherDebtToken, msg.sender);
         }
     }
 
@@ -230,7 +230,7 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
 
     function _collateralState(address borrower) internal view returns (uint256 value, uint256 weightedCapacity) {
         for (uint256 i; i < N_COLLATERAL; ++i) {
-            uint256 tokenValue = oracle.valueInUSDT(address(collateralConfigs[i].token), depositedCollateral[borrower][i]);
+            uint256 tokenValue = oracle.valueInDebtToken(address(collateralConfigs[i].token), depositedCollateral[borrower][i]);
             value += tokenValue;
             weightedCapacity += tokenValue * collateralConfigs[i].maxBorrowLtvBps;
         }
@@ -241,7 +241,7 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         uint8 decimals = IERC20Metadata(address(token)).decimals();
         require(decimals <= 18, "COLLATERAL_DECIMALS");
         uint256 unit = 10 ** decimals;
-        uint256 unitValue = oracle.valueInUSDT(address(token), unit);
+        uint256 unitValue = oracle.valueInDebtToken(address(token), unit);
         require(unitValue != 0, "COLLATERAL_VALUE_ZERO");
         uint256 amount = Math.mulDiv(valueNeeded, unit, unitValue, Math.Rounding.Ceil);
         require(token.balanceOf(borrower) >= amount, "INSUFFICIENT_WALLET_COLLATERAL");
@@ -259,12 +259,12 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         uint256 writtenDown = writtenDownByVault[msg.sender][address(vault)];
         uint256 recovered = amount < writtenDown ? amount : writtenDown;
         writtenDownByVault[msg.sender][address(vault)] = writtenDown - recovered;
-        usdt.safeTransferFrom(msg.sender, address(vault), amount);
+        debtToken.safeTransferFrom(msg.sender, address(vault), amount);
         vault.recordRepayment(amount, recovered);
     }
 
     /// @notice Repays one maturity debt and seizes discounted collateral from an unhealthy borrower.
-    /// @dev The callback may swap the seized collateral and approve USDT back to this app for repayment.
+    /// @dev The callback may swap seized collateral and approve the debt token back to this app for repayment.
     function liquidate(
         address borrower,
         uint40 maturity,
@@ -297,7 +297,7 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
                 borrower, maturity, collateralId, debtAmount, collateralSeized, callbackData
             );
         }
-        usdt.safeTransferFrom(msg.sender, address(vault), debtAmount);
+        debtToken.safeTransferFrom(msg.sender, address(vault), debtAmount);
         vault.recordRepayment(debtAmount, recoveredBadDebt);
 
         uint256 badDebtAdded;
@@ -315,7 +315,7 @@ contract AquaTermApp is AquaApp, ReentrancyGuard {
         uint8 decimals = IERC20Metadata(address(token)).decimals();
         require(decimals <= 18, "COLLATERAL_DECIMALS");
         uint256 unit = 10 ** decimals;
-        uint256 unitValue = oracle.valueInUSDT(address(token), unit);
+        uint256 unitValue = oracle.valueInDebtToken(address(token), unit);
         require(unitValue != 0, "COLLATERAL_VALUE_ZERO");
         uint256 amount = Math.mulDiv(collateralValueNeeded, unit, unitValue, Math.Rounding.Ceil);
         return Math.min(amount, available);
