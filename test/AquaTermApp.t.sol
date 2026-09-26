@@ -124,13 +124,12 @@ contract AquaTermAppTest {
         _assertEq(vault.asset(), address(debtToken), "ERC4626 asset");
         _assertEq(vault.balanceOf(supplier), FACE, "supplier receives shares");
         _assertEq(vault.totalAssets(), FACE, "NAV includes receivable");
-        _assertEq(vault.maxRedeem(supplier), 0, "locked until maturity");
+        _assertEq(vault.maxRedeem(supplier), 0, "no cash before repay");
         _assertEq(debtToken.balanceOf(borrower), SPOT, "borrower receives debt token");
         debtToken.mint(borrower, FACE - SPOT);
         vm.startPrank(borrower); debtToken.approve(address(app), FACE); app.repay(maturity, FACE); vm.stopPrank();
         _assertEq(vault.totalAssets(), FACE, "repayment preserves NAV");
-        vm.warp(maturity);
-        _assertEq(vault.maxRedeem(supplier), FACE, "fully redeemable");
+        _assertEq(vault.maxRedeem(supplier), FACE, "redeemable once repaid");
         vm.prank(supplier); vault.redeem(FACE, supplier, supplier);
         _assertEq(debtToken.balanceOf(supplier), 2_000e6 + 20e6, "supplier earns discount");
     }

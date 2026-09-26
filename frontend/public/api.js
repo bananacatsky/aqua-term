@@ -275,7 +275,7 @@ const AquaApi={
       const canRedeem=!this.isZeroAmount(item.redeemable_shares);
       const redeemBtn=canRedeem
         ? `<button class="btn btn-primary" type="button" data-redeem-vault="${item.vault}" data-redeem-shares="${item.redeemable_shares}">Redeem</button>`
-        : `<button class="btn btn-secondary" type="button" disabled title="Redeemable after maturity when the vault has cash">Redeem</button>`;
+        : `<button class="btn btn-secondary" type="button" disabled title="Redeemable when the vault has cash from repayments">Redeem</button>`;
       return `<div class="position-row"><div><div class="num">${item.label}</div><div class="muted">Fixed maturity</div></div><div><div class="num">${this.formatDebt(item.assets)}</div><div class="muted">Lent now</div></div><div><div class="num">${this.formatDebt(item.redeemable_assets)}</div><div class="muted">Redeemable now</div></div>${redeemBtn}</div>`;
     }).join(''):'<div class="muted">No lending positions.</div>';
     const collateralList=document.getElementById('collateral-list');

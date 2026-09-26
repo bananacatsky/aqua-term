@@ -36,12 +36,10 @@ contract AquaTermVault is ERC4626 {
     function maxMint(address) public pure override returns (uint256) { return 0; }
 
     function maxWithdraw(address owner) public view override returns (uint256) {
-        if (block.timestamp < maturity) return 0;
         return Math.min(super.maxWithdraw(owner), IERC20(asset()).balanceOf(address(this)));
     }
 
     function maxRedeem(address owner) public view override returns (uint256) {
-        if (block.timestamp < maturity) return 0;
         uint256 ownerShares = balanceOf(owner);
         uint256 cash = IERC20(asset()).balanceOf(address(this));
         if (previewRedeem(ownerShares) <= cash) return ownerShares;
@@ -75,7 +73,6 @@ contract AquaTermVault is ERC4626 {
     function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
         internal override
     {
-        require(block.timestamp >= maturity, "NOT_MATURED");
         require(assets <= IERC20(asset()).balanceOf(address(this)), "INSUFFICIENT_CASH");
         super._withdraw(caller, receiver, owner, assets, shares);
     }
